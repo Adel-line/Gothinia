@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { buildMoldingProfile, sweepMolding } from './molding'
+import { buildHoodProfile, buildMoldingProfile, sweepMolding } from './molding'
 
 /**
  * Procedural Rayonnant rose window (after the west rose of Sainte-Chapelle,
@@ -164,63 +164,88 @@ function pointedHead(
 // ---------------------------------------------------------------------------
 
 /**
- * Multifoil oculus: n semicircular foils whose arcs meet at inward-pointing
- * cusps — the cusp is the exact intersection of adjacent foil circles.
+ * Multifoil: n semicircular foils whose arcs meet at inward-pointing cusps —
+ * the cusp is the exact intersection of adjacent foil circles. `center` and
+ * `phase` place and rotate it, so the same construction serves the oculus
+ * and the small quatrefoils in the sub-tracery heads.
  */
-function multifoilPoints(n: number, d: number, rf: number): THREE.Vector2[] {
+function multifoilPoints(
+  n: number,
+  d: number,
+  rf: number,
+  center = new THREE.Vector2(0, 0),
+  phase = 0,
+  segments = 30,
+): THREE.Vector2[] {
   const halfStep = Math.PI / n
   // cusp = OUTER intersection of adjacent foil circles (the union boundary)
   const cuspRadius = d * Math.cos(halfStep) + Math.sqrt(rf * rf - d * d * Math.sin(halfStep) ** 2)
 
   const pts: THREE.Vector2[] = []
   for (let i = 0; i < n; i++) {
-    const theta = (i / n) * TAU
-    const c = polar(theta, d)
-    const cuspNext = polar(theta + halfStep, cuspRadius)
+    const theta = phase + (i / n) * TAU
+    const c = polar(theta, d).add(center)
+    const cuspNext = polar(theta + halfStep, cuspRadius).add(center)
     const psi = Math.abs(angleDelta(theta, Math.atan2(cuspNext.y - c.y, cuspNext.x - c.x)))
     // foil arc sweeps symmetrically through its outward direction, cusp to cusp
-    const arc = arcPoints(c.x, c.y, rf, theta - psi, theta + psi, 30)
+    const arc = arcPoints(c.x, c.y, rf, theta - psi, theta + psi, segments)
     pts.push(...arc.slice(0, -1))
   }
   return ensureWinding(pts, true)
 }
 
-interface BandSpec {
-  count: number
-  rIn: number
-  rSpring: number
-  rApex: number
-  mullionWidth: number
-  cuspDepth: number
+interface LightSide {
+  /** angle of the mullion centreline this edge runs along */
+  theta: number
+  /** half the width of that mullion (edge offset from its centreline) */
+  halfW: number
 }
 
-/** One wedge-shaped light between two radial mullions, with a pointed head. */
-function wedgeLightPoints(band: BandSpec, i: number): THREE.Vector2[] {
-  const sector = TAU / band.count
-  const thetaA = i * sector // mullion on the low-angle side
-  const thetaB = (i + 1) * sector
-  const halfW = band.mullionWidth / 2
-
-  const cA = edgePoint(thetaA, 1, band.rIn, halfW)
-  const cB = edgePoint(thetaB, -1, band.rIn, halfW)
-  const sA = edgePoint(thetaA, 1, band.rSpring, halfW)
-  const sB = edgePoint(thetaB, -1, band.rSpring, halfW)
+/**
+ * One light between two straight (offset-radial) edges, with a pointed head.
+ * The sides may belong to different orders of mullion — a band mullion on one
+ * side and a slim sub-mullion on the other — which is what lets the same
+ * function cut both first-order lights and the twin sub-lancets inside them.
+ */
+function lightPoints(
+  sideA: LightSide,
+  sideB: LightSide,
+  rIn: number,
+  rSpring: number,
+  rApex: number,
+  cuspDepth: number,
+): THREE.Vector2[] {
+  const cA = edgePoint(sideA.theta, 1, rIn, sideA.halfW)
+  const cB = edgePoint(sideB.theta, -1, rIn, sideB.halfW)
+  const sA = edgePoint(sideA.theta, 1, rSpring, sideA.halfW)
+  const sB = edgePoint(sideB.theta, -1, rSpring, sideB.halfW)
 
   const springMid = sA.clone().add(sB).multiplyScalar(0.5)
-  const apexHeight = band.rApex - springMid.length()
+  const apexHeight = rApex - springMid.length()
 
   const pts: THREE.Vector2[] = [
     // sill: arc along the inner ring from A to B (CCW, interior on the left)
-    ...arcPoints(0, 0, band.rIn, Math.atan2(cA.y, cA.x), Math.atan2(cB.y, cB.x), 8),
+    ...arcPoints(0, 0, rIn, Math.atan2(cA.y, cA.x), Math.atan2(cB.y, cB.x), 8),
     // jamb up to the B springer (straight line implied), then the pointed head
-    ...pointedHead(sB, sA, apexHeight, band.cuspDepth),
+    ...pointedHead(sB, sA, apexHeight, cuspDepth),
     // closing straight edge sA -> cA is implied by the closed shape
   ]
   return ensureWinding(pts, true)
 }
 
-export function buildOpenings(): Opening[] {
+export interface RosePlan {
+  openings: Opening[]
+  /**
+   * First-order arch outlines (band-1 bays and band-2 lights). These are NOT
+   * holes — they get a raised hood molding swept along them on the plate
+   * face, marking the heavier order of tracery that frames the sub-lights.
+   */
+  hoodOutlines: THREE.Vector2[][]
+}
+
+export function buildOpenings(): RosePlan {
   const openings: Opening[] = []
+  const hoodOutlines: THREE.Vector2[][] = []
 
   const { foils, centerDist, foilRadius } = ROSE.oculus
   openings.push({
@@ -230,18 +255,90 @@ export function buildOpenings(): Opening[] {
     index: 0,
   })
 
-  for (const [ring, band] of [ROSE.band1, ROSE.band2].entries()) {
-    for (let i = 0; i < band.count; i++) {
-      const thetaC = (i + 0.5) * (TAU / band.count)
-      openings.push({
-        points: wedgeLightPoints(band, i),
-        center: polar(thetaC, (band.rIn + band.rApex) / 2),
-        ring: ring + 1,
-        index: i,
-      })
-    }
+  // ---- band 1: each bay is subdivided Rayonnant-fashion into twin trefoil-
+  // headed sub-lancets under a rotated quatrefoil, all inside a cusped
+  // first-order arch that survives as a hood molding on the plate face.
+  const b1 = ROSE.band1
+  const bay = TAU / b1.count
+  const mainHalf = b1.mullionWidth / 2
+  const subHalf = 0.045
+  for (let i = 0; i < b1.count; i++) {
+    const thetaA = i * bay
+    const thetaB = (i + 1) * bay
+    const thetaC = thetaA + bay / 2
+
+    hoodOutlines.push(
+      lightPoints(
+        { theta: thetaA, halfW: mainHalf },
+        { theta: thetaB, halfW: mainHalf },
+        b1.rIn,
+        b1.rSpring,
+        b1.rApex,
+        b1.cuspDepth,
+      ),
+    )
+
+    const lanc = { rIn: b1.rIn + 0.04, rSpring: 1.95, rApex: 2.28, cusp: 0.05 }
+    openings.push({
+      points: lightPoints(
+        { theta: thetaA, halfW: mainHalf + 0.005 },
+        { theta: thetaC, halfW: subHalf },
+        lanc.rIn,
+        lanc.rSpring,
+        lanc.rApex,
+        lanc.cusp,
+      ),
+      center: polar(thetaC - bay / 4, (lanc.rIn + lanc.rApex) / 2),
+      ring: 1,
+      index: i * 3,
+    })
+    openings.push({
+      points: lightPoints(
+        { theta: thetaC, halfW: subHalf },
+        { theta: thetaB, halfW: mainHalf + 0.005 },
+        lanc.rIn,
+        lanc.rSpring,
+        lanc.rApex,
+        lanc.cusp,
+      ),
+      center: polar(thetaC + bay / 4, (lanc.rIn + lanc.rApex) / 2),
+      ring: 1,
+      index: i * 3 + 1,
+    })
+    // quatrefoil in the head, lobes on the diagonal
+    const qCenter = polar(thetaC, 2.42)
+    openings.push({
+      points: multifoilPoints(4, 0.1, 0.1, qCenter, Math.PI / 4, 18),
+      center: qCenter,
+      ring: 1,
+      index: i * 3 + 2,
+    })
   }
-  return openings
+
+  // ---- band 2: single lights, now with trefoil-cusped heads and their own
+  // (lighter) first-order hoods.
+  const b2 = ROSE.band2
+  const sector = TAU / b2.count
+  const b2Half = b2.mullionWidth / 2
+  for (let i = 0; i < b2.count; i++) {
+    const points = lightPoints(
+      { theta: i * sector, halfW: b2Half },
+      { theta: (i + 1) * sector, halfW: b2Half },
+      b2.rIn,
+      b2.rSpring,
+      b2.rApex,
+      0.055,
+    )
+    openings.push({
+      points,
+      center: polar((i + 0.5) * sector, (b2.rIn + b2.rApex) / 2),
+      ring: 2,
+      index: i,
+    })
+    hoodOutlines.push(points)
+  }
+
+  return { openings, hoodOutlines }
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +352,7 @@ export function buildRoseGeometries(): {
   wallGeometry: THREE.ExtrudeGeometry
   openings: Opening[]
 } {
-  const openings = buildOpenings()
+  const { openings, hoodOutlines } = buildOpenings()
 
   // Stone plate: one shape, every opening a hole — the framework of rings
   // and mullions is the negative space between them. No bevel: the opening
@@ -272,11 +369,22 @@ export function buildRoseGeometries(): {
   })
   stoneGeometry.translate(0, 0, ROSE.plateBack)
 
-  // Carved profile (chamfer, fillet, roll) swept around every opening.
+  // Carved profile (chamfer, fillet, twin ribs) swept around every opening,
+  // plus raised hood moldings along the first-order arches and three plain
+  // concentric ring ribs — the heavier orders of tracery that give the
+  // framework its layered, carved density.
   const profile = buildMoldingProfile(ROSE.plateFront)
-  const moldingGeometry = mergeGeometries(
-    openings.map((o) => sweepMolding(o.points, profile)),
-  )!
+  const hood = buildHoodProfile(ROSE.plateFront, 1)
+  const hoodSmall = buildHoodProfile(ROSE.plateFront, 0.7)
+  const ringCircle = (r: number) =>
+    ensureWinding(arcPoints(0, 0, r, 0, TAU, 160).slice(0, -1), true)
+  const moldingGeometry = mergeGeometries([
+    ...openings.map((o) => sweepMolding(o.points, profile)),
+    ...hoodOutlines.map((pts, i) => sweepMolding(pts, i < ROSE.band1.count ? hood : hoodSmall)),
+    sweepMolding(ringCircle(1.08), hood),
+    sweepMolding(ringCircle(2.82), hood),
+    sweepMolding(ringCircle(4.55), hood),
+  ])!
 
   // Splayed (conical) reveal stepping the thick wall down to the tracery rim.
   const splayProfile = [

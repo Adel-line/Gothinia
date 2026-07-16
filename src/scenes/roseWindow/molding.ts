@@ -68,6 +68,22 @@ export function buildMoldingProfile(plateFront: number): ProfileRow[] {
 }
 
 /**
+ * Hood molding: a raised half-round rib sitting ON the plate face, swept
+ * along a first-order arch outline (which is not a hole). It marks the
+ * heavier order of tracery that frames the sub-lights, and where two bays
+ * meet it merges into one continuous roll over the shared mullion.
+ */
+export function buildHoodProfile(plateFront: number, scale = 1): ProfileRow[] {
+  const rows: ProfileRow[] = []
+  rows.push({ d: 0, z: plateFront, crease: false })
+  for (const p of beadArc(0.055 * scale, plateFront + 0.015 * scale, 0.05 * scale)) {
+    rows.push({ d: p.d, z: p.z, crease: false })
+  }
+  rows.push({ d: 0.13 * scale, z: plateFront, crease: false })
+  return rows
+}
+
+/**
  * Offset a closed CCW outline outward (away from the opening interior) by
  * `dist`, with miter-clamped corner normals so cusp tips and arch apexes
  * don't spike.

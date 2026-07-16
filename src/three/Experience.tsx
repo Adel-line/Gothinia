@@ -37,13 +37,13 @@ export function Experience() {
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{ fov: 36, near: 0.1, far: 120, position: [0, 0, 3.4] }}
     >
-      {/* interior nave: a moderate raking "moonlight" key catches the carved
-          mouldings in a specular highlight so their structure still reads,
-          while ambient stays low enough that the masonry falls toward
-          silhouette and the glass remains the dominant light source */}
-      <hemisphereLight args={['#3a4562', '#0a0806', 0.1]} />
-      <directionalLight position={[-9, 8, 7]} intensity={0.55} color="#aebce4" />
-      <directionalLight position={[8, -4, 9]} intensity={0.09} color="#4a5578" />
+      {/* interior nave: a warm raking key — candlelit-gold rather than
+          moonlight — grazes the carved grain so the moldings read, while
+          ambient stays low enough that the masonry falls toward silhouette
+          and the glass remains the dominant light source */}
+      <hemisphereLight args={['#4a3d2c', '#0a0705', 0.12]} />
+      <directionalLight position={[-9, 8, 7]} intensity={0.6} color="#e6c193" />
+      <directionalLight position={[8, -4, 9]} intensity={0.1} color="#8a6f4d" />
       <CameraRig />
       <ActiveScene />
       <DustMotes />

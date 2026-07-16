@@ -4,6 +4,8 @@ export interface LimestoneOptions {
   color?: string
   roughness?: number
   metalness?: number
+  /** strength of the procedural grain bump (normal perturbation) */
+  bump?: number
 }
 
 /**
@@ -14,6 +16,7 @@ export interface LimestoneOptions {
  * rather than scattering it flat, without changing the noise detail itself.
  */
 export function makeLimestone(opts: LimestoneOptions = {}): THREE.MeshStandardMaterial {
+  const bump = opts.bump ?? 0.05
   const mat = new THREE.MeshStandardMaterial({
     color: opts.color ?? '#b3a488',
     roughness: opts.roughness ?? 0.93,
@@ -104,7 +107,37 @@ export function makeLimestone(opts: LimestoneOptions = {}): THREE.MeshStandardMa
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
-        roughnessFactor = clamp(roughnessFactor - limeNoise(vLimePos * 9.0) * 0.12, 0.0, 1.0);`,
+        roughnessFactor = clamp(roughnessFactor - limeNoise(vLimePos * 9.0) * 0.18
+                                + limeNoise(vLimePos * 27.0) * 0.14, 0.0, 1.0);`,
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+        {
+          // procedural grain bump: perturb the shading normal with the
+          // gradient of a fine noise field, so specular highlights break up
+          // over a granular surface instead of sliding across polish
+          float bs = ${bump.toFixed(3)};
+          float ge = 0.05;
+          vec3 gp = vLimePos * 24.0;
+          float g0 = limeNoise(gp);
+          vec3 grad = vec3(
+            limeNoise(gp + vec3(ge, 0.0, 0.0)) - g0,
+            limeNoise(gp + vec3(0.0, ge, 0.0)) - g0,
+            limeNoise(gp + vec3(0.0, 0.0, ge)) - g0
+          ) / ge;
+          // coarser second octave: pitting and tool marks
+          vec3 gp2 = vLimePos * 6.5;
+          float h0 = limeNoise(gp2);
+          grad += 0.6 * vec3(
+            limeNoise(gp2 + vec3(ge, 0.0, 0.0)) - h0,
+            limeNoise(gp2 + vec3(0.0, ge, 0.0)) - h0,
+            limeNoise(gp2 + vec3(0.0, 0.0, ge)) - h0
+          ) / ge;
+          vec3 gv = (viewMatrix * vec4(grad, 0.0)).xyz;
+          gv -= normal * dot(gv, normal); // keep it tangent to the surface
+          normal = normalize(normal - gv * bs);
+        }`,
       )
   }
 

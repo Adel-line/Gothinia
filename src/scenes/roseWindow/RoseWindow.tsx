@@ -47,11 +47,10 @@ export function RoseWindow() {
     m.side = THREE.DoubleSide // splay cone is seen from inside
     return m
   }, [])
-  // carved moulding: darker and glossier than the flat plate, so the
-  // rounded ribs catch the raking key light as a distinct highlight against
-  // near-black recesses instead of the whole face washing out evenly
+  // carved moulding: slightly darker than the flat plate but just as matte —
+  // structure comes from the raking light over the grain bump, not gloss
   const moldingStone = useMemo(
-    () => makeLimestone({ color: '#6e6151', roughness: 0.3, metalness: 0.24 }),
+    () => makeLimestone({ color: '#8d7c64', roughness: 0.82, metalness: 0.0, bump: 0.09 }),
     [],
   )
   const glassMaterials = useMemo(
@@ -85,8 +84,8 @@ export function RoseWindow() {
       {/* scattered glow bouncing off the glass onto the facing stone —
           sits just in front of the window, close and falling off fast so
           it rim-lights the moldings and reveal without flooding the nave */}
-      <pointLight position={[0, 0, 1.1]} intensity={1.8} color="#5f7fd6" distance={4} decay={2} />
-      <pointLight position={[0, 0, 0.9]} intensity={0.45} color="#c4552e" distance={3} decay={2} />
+      <pointLight position={[0, 0, 1.1]} intensity={2.2} color="#d9954e" distance={5} decay={2} />
+      <pointLight position={[0, 0, 0.9]} intensity={0.5} color="#7a86c8" distance={3} decay={2} />
     </group>
   )
 }
