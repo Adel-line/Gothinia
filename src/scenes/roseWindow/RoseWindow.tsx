@@ -47,6 +47,13 @@ export function RoseWindow() {
     m.side = THREE.DoubleSide // splay cone is seen from inside
     return m
   }, [])
+  // carved moulding: darker and glossier than the flat plate, so the
+  // rounded ribs catch the raking key light as a distinct highlight against
+  // near-black recesses instead of the whole face washing out evenly
+  const moldingStone = useMemo(
+    () => makeLimestone({ color: '#6e6151', roughness: 0.3, metalness: 0.24 }),
+    [],
+  )
   const glassMaterials = useMemo(
     () => GLASS_PALETTE.map((hex, i) => makeStainedGlass(hex, 2.2 + (i % 4) * 0.32)),
     [],
@@ -65,7 +72,7 @@ export function RoseWindow() {
     <group>
       <mesh geometry={wallGeometry} material={limestone} />
       <mesh geometry={stoneGeometry} material={limestone} />
-      <mesh geometry={moldingGeometry} material={limestone} />
+      <mesh geometry={moldingGeometry} material={moldingStone} />
       <mesh geometry={splayGeometry} material={limestoneDS} />
       {panes.map((p) => (
         <mesh

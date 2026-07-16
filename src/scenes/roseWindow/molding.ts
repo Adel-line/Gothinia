@@ -19,28 +19,51 @@ interface ProfileRow {
   crease: boolean
 }
 
+function arcRow(cd: number, cz: number, rr: number, deg: number): { d: number; z: number } {
+  const a = THREE.MathUtils.degToRad(deg)
+  return { d: cd + Math.cos(a) * rr, z: cz + Math.sin(a) * rr }
+}
+
+/** One rounded bead (bowtell), sampled 155°→25° so it crests at its top. */
+function beadArc(cd: number, cz: number, rr: number, segments = 8): { d: number; z: number }[] {
+  const pts: { d: number; z: number }[] = []
+  for (let i = 0; i <= segments; i++) pts.push(arcRow(cd, cz, rr, 155 - (130 * i) / segments))
+  return pts
+}
+
+/**
+ * Twin-rib moulding: a smaller inner bead and a larger outer bead separated
+ * by a shadow groove, echoing the doubled bowtell mouldings on a real
+ * Rayonnant rose (rather than one fat roll). Kept within roughly the same
+ * outward reach as a single roll so it doesn't overrun the narrow mullions
+ * between openings.
+ */
 export function buildMoldingProfile(plateFront: number): ProfileRow[] {
   const rows: ProfileRow[] = []
   const push = (d: number, z: number, crease = false) => rows.push({ d, z, crease })
 
   // splayed chamfer from the glass reveal up toward the light
   push(0.0, 0.04)
-  push(0.026, 0.2)
-  // fillet riser
-  push(0.026, 0.2, true)
-  push(0.029, plateFront + 0.024)
-  // roll (bowtell): arc cresting at d = 0.08 — the shared mullion centreline
-  const cd = 0.08
-  const cz = plateFront
-  const rr = 0.056
-  for (let i = 0; i <= 8; i++) {
-    const a = THREE.MathUtils.degToRad(155 - (130 * i) / 8)
-    push(cd + Math.cos(a) * rr, cz + Math.sin(a) * rr, i === 0)
-  }
-  // tail back down onto the plate face (submerges under the neighbouring
-  // opening's roll on narrow mullions)
-  push(cd + Math.cos(THREE.MathUtils.degToRad(25)) * rr, cz + Math.sin(THREE.MathUtils.degToRad(25)) * rr, true)
-  push(0.15, plateFront)
+  push(0.024, 0.19)
+  // fillet riser (hard edge off the chamfer)
+  push(0.024, 0.19, true)
+  push(0.028, plateFront - 0.015)
+
+  // inner bead — the smaller of the twin ribs
+  const bead1 = beadArc(0.045, plateFront - 0.005, 0.02)
+  bead1.forEach((p) => push(p.d, p.z))
+
+  // groove between the ribs — reads as a shadow line
+  const grooveD = bead1[bead1.length - 1].d + 0.012
+  push(grooveD, plateFront - 0.03)
+
+  // outer bead — the more prominent rib, cresting near the shared
+  // mullion centreline
+  const bead2 = beadArc(grooveD + 0.03, plateFront + 0.01, 0.026)
+  bead2.forEach((p) => push(p.d, p.z))
+
+  // tail back down onto the plate face
+  push(bead2[bead2.length - 1].d + 0.03, plateFront)
   return rows
 }
 

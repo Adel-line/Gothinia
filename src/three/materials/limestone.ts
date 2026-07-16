@@ -1,14 +1,23 @@
 import * as THREE from 'three'
 
+export interface LimestoneOptions {
+  color?: string
+  roughness?: number
+  metalness?: number
+}
+
 /**
  * Warm limestone. Surface variation is procedural value noise injected into
  * the standard material's fragment shader — no texture files anywhere.
+ * Lower roughness / added metalness (used for the carved mouldings) gives a
+ * worn, hand-dressed sheen that catches directional light in a highlight
+ * rather than scattering it flat, without changing the noise detail itself.
  */
-export function makeLimestone(): THREE.MeshStandardMaterial {
+export function makeLimestone(opts: LimestoneOptions = {}): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({
-    color: '#cfc0a6',
-    roughness: 0.93,
-    metalness: 0.0,
+    color: opts.color ?? '#b3a488',
+    roughness: opts.roughness ?? 0.93,
+    metalness: opts.metalness ?? 0.0,
   })
 
   mat.onBeforeCompile = (shader) => {

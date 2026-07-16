@@ -4,6 +4,7 @@ import { scenes } from '../scenes/registry'
 import { scenePhase, scrollState } from '../scroll/scrollState'
 import { CameraRig } from './CameraRig'
 import { Effects } from './Effects'
+import { DustMotes } from './effects/DustMotes'
 
 /**
  * Mounts only the active scene's procedural geometry. The scene index flips
@@ -23,6 +24,7 @@ function ActiveScene() {
   return (
     <>
       <color attach="background" args={[def.background]} />
+      <fogExp2 attach="fog" args={[def.background, 0.045]} />
       <def.Component />
     </>
   )
@@ -35,14 +37,16 @@ export function Experience() {
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{ fov: 36, near: 0.1, far: 120, position: [0, 0, 3.4] }}
     >
-      {/* interior nave: almost no ambient daylight on the stone — the glass
-          is the only real light source, the masonry reads as near-silhouette
-          with just enough fill for SSAO to model the carving */}
+      {/* interior nave: a moderate raking "moonlight" key catches the carved
+          mouldings in a specular highlight so their structure still reads,
+          while ambient stays low enough that the masonry falls toward
+          silhouette and the glass remains the dominant light source */}
       <hemisphereLight args={['#3a4562', '#0a0806', 0.1]} />
-      <directionalLight position={[-9, 8, 7]} intensity={0.1} color="#6b7ca8" />
-      <directionalLight position={[8, -4, 9]} intensity={0.05} color="#4a5578" />
+      <directionalLight position={[-9, 8, 7]} intensity={0.55} color="#aebce4" />
+      <directionalLight position={[8, -4, 9]} intensity={0.09} color="#4a5578" />
       <CameraRig />
       <ActiveScene />
+      <DustMotes />
       <Effects />
     </Canvas>
   )
