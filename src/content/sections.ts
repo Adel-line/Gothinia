@@ -31,4 +31,23 @@ export const sections: SectionContent[] = [
       'Stained-glass pane',
     ],
   },
+  {
+    id: 'pointed-arch',
+    kicker: 'Duomo di Milano · Milan · Lombard Gothic',
+    title: 'The Pointed Arch',
+    body:
+      'The pointed arch is two circular arcs leaning together, and that break ' +
+      'at the crown changes everything: thrust that a round arch spreads ' +
+      'sideways is steered steeply down into the piers, so walls could rise ' +
+      'far higher on far less stone. In Milan the arcade pushes the idea to ' +
+      'its limit — clustered piers as tall as a six-storey building carry ' +
+      'tier upon tier of arches, and daylight enters only high above, ' +
+      'through the glazed lancets of the clerestory.',
+    calloutLabels: [
+      'Two-centred apex',
+      'Clustered pier',
+      'Carved capital',
+      'Clerestory lancets',
+    ],
+  },
 ]
