@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, SSAO, Vignette } from '@react-three/postprocessing'
+import { BlendFunction } from 'postprocessing'
 import { EdgeBlurEffect } from './effects/EdgeBlur'
 import { scenes } from '../scenes/registry'
 import { edgeBlurStrength, scenePhase, scrollState, swapBlurStrength } from '../scroll/scrollState'
@@ -19,7 +20,20 @@ export function Effects() {
   })
 
   return (
-    <EffectComposer multisampling={4}>
+    <EffectComposer multisampling={0} enableNormalPass>
+      <SSAO
+        blendFunction={BlendFunction.MULTIPLY}
+        samples={24}
+        rings={4}
+        radius={0.14}
+        intensity={5}
+        bias={0.025}
+        luminanceInfluence={0.6}
+        worldDistanceThreshold={30}
+        worldDistanceFalloff={5}
+        worldProximityThreshold={0.5}
+        worldProximityFalloff={0.2}
+      />
       <Bloom mipmapBlur luminanceThreshold={0.42} luminanceSmoothing={0.28} intensity={0.7} />
       <primitive object={edgeBlur} />
       <Vignette eskil={false} offset={0.22} darkness={0.52} />

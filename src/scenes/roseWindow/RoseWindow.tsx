@@ -37,10 +37,18 @@ function glassGeometry(opening: Opening): THREE.ShapeGeometry {
 }
 
 export function RoseWindow() {
-  const { stoneGeometry, wallGeometry, openings } = useMemo(buildRoseGeometries, [])
+  const { stoneGeometry, moldingGeometry, splayGeometry, wallGeometry, openings } = useMemo(
+    buildRoseGeometries,
+    [],
+  )
   const limestone = useMemo(makeLimestone, [])
+  const limestoneDS = useMemo(() => {
+    const m = makeLimestone()
+    m.side = THREE.DoubleSide // splay cone is seen from inside
+    return m
+  }, [])
   const glassMaterials = useMemo(
-    () => GLASS_PALETTE.map((hex, i) => makeStainedGlass(hex, 1.3 + (i % 4) * 0.22)),
+    () => GLASS_PALETTE.map((hex, i) => makeStainedGlass(hex, 1.5 + (i % 4) * 0.22)),
     [],
   )
   const panes = useMemo(
@@ -57,6 +65,8 @@ export function RoseWindow() {
     <group>
       <mesh geometry={wallGeometry} material={limestone} />
       <mesh geometry={stoneGeometry} material={limestone} />
+      <mesh geometry={moldingGeometry} material={limestone} />
+      <mesh geometry={splayGeometry} material={limestoneDS} />
       {panes.map((p) => (
         <mesh
           key={p.key}

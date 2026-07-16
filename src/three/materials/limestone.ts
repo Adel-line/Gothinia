@@ -55,6 +55,41 @@ export function makeLimestone(): THREE.MeshStandardMaterial {
           float drift = limeNoise(vLimePos * 0.55);
           diffuseColor.rgb *= mix(0.82, 1.10, grain);
           diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.04, 1.0, 0.92), drift * 0.5);
+
+          float r = length(vLimePos.xy);
+
+          // ashlar coursing on the wall face (beyond the splayed reveal):
+          // offset rows of blocks, darkened mortar joints, per-block tint
+          if (r > 5.62) {
+            float row = floor(vLimePos.y / 0.82);
+            float wob = (limeNoise(vec3(row * 3.1, 0.0, 1.0)) - 0.5) * 0.7;
+            float colW = 1.55;
+            float cx = vLimePos.x / colW + mod(row, 2.0) * 0.5 + wob;
+            float col = floor(cx);
+            float fy = fract(vLimePos.y / 0.82);
+            float fx = fract(cx);
+            float dJoint = min(min(fy, 1.0 - fy) * 0.82, min(fx, 1.0 - fx) * colW);
+            float joint = 1.0 - smoothstep(0.012, 0.04, dJoint);
+            float blockTint = limeHash(vec3(col, row, 5.0));
+            diffuseColor.rgb *= mix(0.9, 1.06, blockTint);
+            diffuseColor.rgb *= 1.0 - joint * 0.42;
+          }
+
+          // radial voussoir joints around the enclosing ring and splay
+          if (r > 4.42 && r < 5.62) {
+            float a = atan(vLimePos.y, vLimePos.x);
+            float seg = a / 0.3926990817; // 16 voussoirs (22.5 deg each)
+            float fa = fract(seg);
+            float dJoint = min(fa, 1.0 - fa) * 0.3926990817 * r;
+            float joint = 1.0 - smoothstep(0.012, 0.038, dJoint);
+            diffuseColor.rgb *= mix(0.92, 1.05, limeHash(vec3(floor(seg), 2.0, 8.0)));
+            diffuseColor.rgb *= 1.0 - joint * 0.38;
+          }
+
+          // vertical weathering streaks, heavier low on the wall
+          float streak = limeNoise(vec3(vLimePos.x * 2.6, vLimePos.y * 0.22, vLimePos.z * 2.6));
+          float lowness = clamp((2.0 - vLimePos.y) * 0.12, 0.0, 0.7);
+          diffuseColor.rgb *= 1.0 - streak * streak * lowness * 0.35;
         }`,
       )
       .replace(

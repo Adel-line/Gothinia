@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { buildMoldingProfile, sweepMolding } from './molding'
 
 /**
  * Procedural Rayonnant rose window (after the west rose of Sainte-Chapelle,
@@ -24,8 +26,11 @@ const TAU = Math.PI * 2
 // ---------------------------------------------------------------------------
 export const ROSE = {
   plateRadius: 4.9,
-  wallHoleRadius: 4.82,
+  wallHoleRadius: 5.56,
   stoneDepth: 0.6,
+  /** front face of the pierced plate; molding rolls crest ~0.06 above it */
+  plateFront: 0.235,
+  plateBack: -0.3,
   glassZ: -0.12,
   oculus: { foils: 8, centerDist: 0.64, foilRadius: 0.28 },
   band1: { count: 16, rIn: 1.3, rSpring: 2.3, rApex: 2.75, mullionWidth: 0.16, cuspDepth: 0.09 },
@@ -245,13 +250,16 @@ export function buildOpenings(): Opening[] {
 
 export function buildRoseGeometries(): {
   stoneGeometry: THREE.ExtrudeGeometry
+  moldingGeometry: THREE.BufferGeometry
+  splayGeometry: THREE.BufferGeometry
   wallGeometry: THREE.ExtrudeGeometry
   openings: Opening[]
 } {
   const openings = buildOpenings()
 
   // Stone plate: one shape, every opening a hole — the framework of rings
-  // and mullions is the negative space between them.
+  // and mullions is the negative space between them. No bevel: the opening
+  // rims are dressed by the swept moldings instead.
   const plate = new THREE.Shape(
     ensureWinding(arcPoints(0, 0, ROSE.plateRadius, 0, TAU, 128).slice(0, -1), true),
   )
@@ -259,15 +267,28 @@ export function buildRoseGeometries(): {
     plate.holes.push(new THREE.Path(ensureWinding(o.points.map((p) => p.clone()), false)))
   }
   const stoneGeometry = new THREE.ExtrudeGeometry(plate, {
-    depth: ROSE.stoneDepth,
-    bevelEnabled: true,
-    bevelThickness: 0.045,
-    bevelSize: 0.035,
-    bevelSegments: 2,
+    depth: ROSE.plateFront - ROSE.plateBack,
+    bevelEnabled: false,
   })
-  stoneGeometry.translate(0, 0, -ROSE.stoneDepth / 2)
+  stoneGeometry.translate(0, 0, ROSE.plateBack)
 
-  // Surrounding wall with a circular reveal the rose sits inside.
+  // Carved profile (chamfer, fillet, roll) swept around every opening.
+  const profile = buildMoldingProfile(ROSE.plateFront)
+  const moldingGeometry = mergeGeometries(
+    openings.map((o) => sweepMolding(o.points, profile)),
+  )!
+
+  // Splayed (conical) reveal stepping the thick wall down to the tracery rim.
+  const splayProfile = [
+    new THREE.Vector2(4.86, -0.05),
+    new THREE.Vector2(5.14, 0.16),
+    new THREE.Vector2(5.2, 0.2),
+    new THREE.Vector2(5.6, 0.45),
+  ]
+  const splayGeometry = new THREE.LatheGeometry(splayProfile, 96)
+  splayGeometry.rotateX(Math.PI / 2)
+
+  // Surrounding wall with a circular reveal the splay sits inside.
   const wall = new THREE.Shape()
   wall.moveTo(-16, -13)
   wall.lineTo(16, -13)
@@ -279,14 +300,11 @@ export function buildRoseGeometries(): {
   )
   const wallGeometry = new THREE.ExtrudeGeometry(wall, {
     depth: 1.2,
-    bevelEnabled: true,
-    bevelThickness: 0.05,
-    bevelSize: 0.04,
-    bevelSegments: 1,
+    bevelEnabled: false,
   })
-  wallGeometry.translate(0, 0, -0.75) // tracery sits recessed inside the reveal
+  wallGeometry.translate(0, 0, -0.75) // wall front face at z = 0.45
 
-  return { stoneGeometry, wallGeometry, openings }
+  return { stoneGeometry, moldingGeometry, splayGeometry, wallGeometry, openings }
 }
 
 // ---------------------------------------------------------------------------
