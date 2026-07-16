@@ -12,24 +12,34 @@ import {
 } from '../lib/gothic2d'
 
 /**
- * Procedural Rayonnant rose window (after the west rose of Sainte-Chapelle,
- * simplified). Everything is constructed with real Gothic tracery logic:
+ * Procedural Rayonnant rose window, rebuilt after the north transept rose of
+ * Notre-Dame de Paris (and the glazing of Sainte-Chapelle). The point of the
+ * rebuild is *architectural hierarchy*: a real rose is not one repeated motif
+ * on a wheel, it is a sequence of concentric ORDERS that grow as they radiate,
+ * threaded onto radial mullions and pinned at every ring by foiled circles.
  *
- *  - the whole design radiates from a central multifoil oculus;
- *  - each light (glass opening) has a pointed head built as TWO INTERSECTING
- *    CIRCULAR ARCS whose centres sit on the springing line (the true
- *    two-centre arch construction — e = 0 gives a semicircle, e = half-span
- *    the equilateral arch);
- *  - the inner ring of sixteen lights is cusped into trefoil heads;
- *  - the stone framework is ONE plate with the openings as literal holes,
- *    so mullions and rings emerge from the spacing between lights, exactly
- *    as pierced plate tracery does.
+ * Reading from the centre outward, on a strict sixteen-fold division:
  *
- * The plan is built in 2D (window plane = XY, facing +Z) and extruded.
+ *   0  central octofoil OCULUS
+ *   A  sixteen small trefoil-headed PETAL lights (the inner wreath)
+ *   1  a ring of sixteen cusped QUATREFOIL medallions, one on every radial
+ *      mullion — the nodes where the spokes cross the first string-course
+ *   C  sixteen taller cinquefoil-cusped lights (the middle order)
+ *   2  a ring of sixteen SEXFOIL medallions on the mullions
+ *   D  sixteen first-order arches, each PROPERLY SUBDIVIDED into twin
+ *      trefoil sub-lancets beneath a small quatrefoil — the largest lights
+ *      carry the densest tracery, exactly as bar tracery does
+ *      + a thick, deep dressed-stone RIM carrying two molded archivolt rolls
+ *
+ * Everything is still one pierced stone plate with the openings cut as holes,
+ * so the mullions, ring courses and spandrels are the negative space between
+ * lights — genuine plate/bar tracery logic, not a drawn pattern. The plan is
+ * built in 2D (window plane = XY, facing +Z) and extruded; carved moldings are
+ * swept around every opening and along the heavier orders.
  */
 
 // ---------------------------------------------------------------------------
-// Radial layout (world units; the rose is ~10 units across)
+// Radial layout (world units; the rose is ~9.8 units across the glazed field)
 // ---------------------------------------------------------------------------
 export const ROSE = {
   plateRadius: 4.9,
@@ -37,11 +47,37 @@ export const ROSE = {
   stoneDepth: 0.6,
   /** front face of the pierced plate; molding rolls crest ~0.06 above it */
   plateFront: 0.235,
-  plateBack: -0.3,
+  /** deep back face — a thick wall gives the openings a real splayed reveal
+      and long raking shadows, so the tracery reads as carved stone, not a cut
+      sheet of card */
+  plateBack: -0.55,
   glassZ: -0.12,
-  oculus: { foils: 8, centerDist: 0.64, foilRadius: 0.28 },
-  band1: { count: 16, rIn: 1.3, rSpring: 2.3, rApex: 2.75, mullionWidth: 0.16, cuspDepth: 0.09 },
-  band2: { count: 32, rIn: 3.0, rSpring: 4.0, rApex: 4.45, mullionWidth: 0.12, cuspDepth: 0 },
+
+  /** N-fold symmetry. Sixteen radial mullions (spokes). */
+  spokes: 16,
+
+  oculus: { foils: 8, centerDist: 0.42, foilRadius: 0.3 },
+
+  // inner wreath of petal lights
+  bandA: { rIn: 1.08, rSpring: 1.55, rApex: 2.02, mullionWidth: 0.12, cusp: 0.05 },
+  // first node ring — quatrefoils on the spokes
+  node1: { r: 2.3, foils: 4, centerDist: 0.1, foilRadius: 0.14, phase: Math.PI / 4 },
+  // middle order lights
+  bandC: { rIn: 2.54, rSpring: 3.08, rApex: 3.5, mullionWidth: 0.13, cusp: 0.06 },
+  // second node ring — sexfoils on the spokes
+  node2: { r: 3.72, foils: 6, centerDist: 0.09, foilRadius: 0.11, phase: 0 },
+  // outer order: first-order arches subdivided into twin sub-lancets
+  bandD: {
+    rIn: 3.92,
+    rSpring: 4.32,
+    rApex: 4.6,
+    mullionWidth: 0.15,
+    subHalf: 0.05,
+    sub: { rIn: 3.97, rSpring: 4.14, rApex: 4.36, cusp: 0.04 },
+    quatrefoil: { r: 4.46, foils: 4, centerDist: 0.075, foilRadius: 0.085, phase: 0 },
+  },
+  // molded archivolt rolls carried on the thick outer rim
+  archivolt: [4.7, 4.8],
 }
 
 export interface Opening {
@@ -49,7 +85,7 @@ export interface Opening {
   points: THREE.Vector2[]
   /** Representative centre, used for colour seeding and glass expansion. */
   center: THREE.Vector2
-  /** 0 = oculus, 1 = inner band, 2 = outer band. */
+  /** ring family (0 = oculus … 6 = outer sub-tracery), seeds pane colour. */
   ring: number
   index: number
 }
@@ -62,10 +98,10 @@ interface LightSide {
 }
 
 /**
- * One radial light between two straight (offset-radial) edges, with a
- * pointed head. The sides may belong to different orders of mullion, which
- * is what lets the same function cut first-order lights and the twin
- * sub-lancets inside them.
+ * One radial light between two straight (offset-radial) mullion edges, with a
+ * two-centre pointed head. The sides may belong to different orders of
+ * mullion, which is what lets the same routine cut a first-order light and the
+ * twin sub-lancets inside it.
  */
 function lightPoints(
   sideA: LightSide,
@@ -86,19 +122,38 @@ function lightPoints(
   const pts: THREE.Vector2[] = [
     // sill: arc along the inner ring from A to B (CCW, interior on the left)
     ...arcPoints(0, 0, rIn, Math.atan2(cA.y, cA.x), Math.atan2(cB.y, cB.x), 8),
-    // jamb up to the B springer (straight line implied), then the pointed head
+    // jamb up to the B springer, then the pointed (optionally cusped) head
     ...pointedHead(sB, sA, apexHeight, cuspDepth),
-    // closing straight edge sA -> cA is implied by the closed shape
   ]
   return ensureWinding(pts, true)
+}
+
+/** A cusped foiled circle (qu/cinq/sexfoil medallion) centred on a spoke. */
+function medallion(
+  theta: number,
+  r: number,
+  foils: number,
+  centerDist: number,
+  foilRadius: number,
+  phase: number,
+  ring: number,
+  index: number,
+): Opening {
+  const center = polar(theta, r)
+  return {
+    points: multifoilPoints(foils, centerDist, foilRadius, center, phase, 20),
+    center,
+    ring,
+    index,
+  }
 }
 
 export interface RosePlan {
   openings: Opening[]
   /**
-   * First-order arch outlines (band-1 bays and band-2 lights). These are NOT
-   * holes — they get a raised hood molding swept along them on the plate
-   * face, marking the heavier order of tracery that frames the sub-lights.
+   * First-order arch outlines (the band-D enclosing arches). These are NOT
+   * holes — they carry a raised hood molding on the plate face, marking the
+   * heavier order of tracery that frames the twin sub-lancets.
    */
   hoodOutlines: THREE.Vector2[][]
 }
@@ -106,96 +161,131 @@ export interface RosePlan {
 export function buildOpenings(): RosePlan {
   const openings: Opening[] = []
   const hoodOutlines: THREE.Vector2[][] = []
+  const N = ROSE.spokes
+  const bay = TAU / N
 
-  const { foils, centerDist, foilRadius } = ROSE.oculus
+  // ---- 0: central octofoil oculus
+  const oc = ROSE.oculus
   openings.push({
-    points: multifoilPoints(foils, centerDist, foilRadius),
+    points: multifoilPoints(oc.foils, oc.centerDist, oc.foilRadius),
     center: new THREE.Vector2(0, 0),
     ring: 0,
     index: 0,
   })
 
-  // ---- band 1: each bay is subdivided Rayonnant-fashion into twin trefoil-
-  // headed sub-lancets under a rotated quatrefoil, all inside a cusped
-  // first-order arch that survives as a hood molding on the plate face.
-  const b1 = ROSE.band1
-  const bay = TAU / b1.count
-  const mainHalf = b1.mullionWidth / 2
-  const subHalf = 0.045
-  for (let i = 0; i < b1.count; i++) {
+  // ---- A: inner wreath of trefoil-headed petal lights (one per bay)
+  const a = ROSE.bandA
+  const aHalf = a.mullionWidth / 2
+  for (let i = 0; i < N; i++) {
+    const thetaA = i * bay
+    const thetaB = (i + 1) * bay
+    openings.push({
+      points: lightPoints(
+        { theta: thetaA, halfW: aHalf },
+        { theta: thetaB, halfW: aHalf },
+        a.rIn,
+        a.rSpring,
+        a.rApex,
+        a.cusp,
+      ),
+      center: polar(thetaA + bay / 2, (a.rIn + a.rApex) / 2),
+      ring: 1,
+      index: i,
+    })
+  }
+
+  // ---- 1: quatrefoil node ring, one medallion on every spoke
+  const n1 = ROSE.node1
+  for (let i = 0; i < N; i++) {
+    openings.push(
+      medallion(i * bay, n1.r, n1.foils, n1.centerDist, n1.foilRadius, n1.phase, 2, i),
+    )
+  }
+
+  // ---- C: middle order — taller cinquefoil-cusped lights (one per bay)
+  const c = ROSE.bandC
+  const cHalf = c.mullionWidth / 2
+  for (let i = 0; i < N; i++) {
+    const thetaA = i * bay
+    const thetaB = (i + 1) * bay
+    openings.push({
+      points: lightPoints(
+        { theta: thetaA, halfW: cHalf },
+        { theta: thetaB, halfW: cHalf },
+        c.rIn,
+        c.rSpring,
+        c.rApex,
+        c.cusp,
+      ),
+      center: polar(thetaA + bay / 2, (c.rIn + c.rApex) / 2),
+      ring: 3,
+      index: i,
+    })
+  }
+
+  // ---- 2: sexfoil node ring on the spokes
+  const n2 = ROSE.node2
+  for (let i = 0; i < N; i++) {
+    openings.push(
+      medallion(i * bay, n2.r, n2.foils, n2.centerDist, n2.foilRadius, n2.phase, 4, i),
+    )
+  }
+
+  // ---- D: outer order — first-order arches subdivided into twin trefoil
+  // sub-lancets under a small quatrefoil; the enclosing arch survives as a
+  // hood molding, so each outer bay reads as a light within a light.
+  const d = ROSE.bandD
+  const dHalf = d.mullionWidth / 2
+  for (let i = 0; i < N; i++) {
     const thetaA = i * bay
     const thetaB = (i + 1) * bay
     const thetaC = thetaA + bay / 2
 
+    // first-order enclosing arch (hood only, not a hole)
     hoodOutlines.push(
       lightPoints(
-        { theta: thetaA, halfW: mainHalf },
-        { theta: thetaB, halfW: mainHalf },
-        b1.rIn,
-        b1.rSpring,
-        b1.rApex,
-        b1.cuspDepth,
+        { theta: thetaA, halfW: dHalf },
+        { theta: thetaB, halfW: dHalf },
+        d.rIn,
+        d.rSpring,
+        d.rApex,
+        0,
       ),
     )
 
-    const lanc = { rIn: b1.rIn + 0.04, rSpring: 1.95, rApex: 2.28, cusp: 0.05 }
+    // twin sub-lancets
     openings.push({
       points: lightPoints(
-        { theta: thetaA, halfW: mainHalf + 0.005 },
-        { theta: thetaC, halfW: subHalf },
-        lanc.rIn,
-        lanc.rSpring,
-        lanc.rApex,
-        lanc.cusp,
+        { theta: thetaA, halfW: dHalf + 0.01 },
+        { theta: thetaC, halfW: d.subHalf },
+        d.sub.rIn,
+        d.sub.rSpring,
+        d.sub.rApex,
+        d.sub.cusp,
       ),
-      center: polar(thetaC - bay / 4, (lanc.rIn + lanc.rApex) / 2),
-      ring: 1,
-      index: i * 3,
+      center: polar(thetaC - bay / 4, (d.sub.rIn + d.sub.rApex) / 2),
+      ring: 5,
+      index: i * 2,
     })
     openings.push({
       points: lightPoints(
-        { theta: thetaC, halfW: subHalf },
-        { theta: thetaB, halfW: mainHalf + 0.005 },
-        lanc.rIn,
-        lanc.rSpring,
-        lanc.rApex,
-        lanc.cusp,
+        { theta: thetaC, halfW: d.subHalf },
+        { theta: thetaB, halfW: dHalf + 0.01 },
+        d.sub.rIn,
+        d.sub.rSpring,
+        d.sub.rApex,
+        d.sub.cusp,
       ),
-      center: polar(thetaC + bay / 4, (lanc.rIn + lanc.rApex) / 2),
-      ring: 1,
-      index: i * 3 + 1,
+      center: polar(thetaC + bay / 4, (d.sub.rIn + d.sub.rApex) / 2),
+      ring: 5,
+      index: i * 2 + 1,
     })
-    // quatrefoil in the head, lobes on the diagonal
-    const qCenter = polar(thetaC, 2.42)
-    openings.push({
-      points: multifoilPoints(4, 0.1, 0.1, qCenter, Math.PI / 4, 18),
-      center: qCenter,
-      ring: 1,
-      index: i * 3 + 2,
-    })
-  }
 
-  // ---- band 2: single lights, now with trefoil-cusped heads and their own
-  // (lighter) first-order hoods.
-  const b2 = ROSE.band2
-  const sector = TAU / b2.count
-  const b2Half = b2.mullionWidth / 2
-  for (let i = 0; i < b2.count; i++) {
-    const points = lightPoints(
-      { theta: i * sector, halfW: b2Half },
-      { theta: (i + 1) * sector, halfW: b2Half },
-      b2.rIn,
-      b2.rSpring,
-      b2.rApex,
-      0.055,
+    // small quatrefoil in the head of the enclosing arch
+    const q = d.quatrefoil
+    openings.push(
+      medallion(thetaC, q.r, q.foils, q.centerDist, q.foilRadius, q.phase, 6, i),
     )
-    openings.push({
-      points,
-      center: polar((i + 0.5) * sector, (b2.rIn + b2.rApex) / 2),
-      ring: 2,
-      index: i,
-    })
-    hoodOutlines.push(points)
   }
 
   return { openings, hoodOutlines }
@@ -214,11 +304,12 @@ export function buildRoseGeometries(): {
 } {
   const { openings, hoodOutlines } = buildOpenings()
 
-  // Stone plate: one shape, every opening a hole — the framework of rings
-  // and mullions is the negative space between them. No bevel: the opening
-  // rims are dressed by the swept moldings instead.
+  // Stone plate: one shape, every opening a hole — the framework of rings,
+  // mullions and spandrels is the negative space between them. No bevel: the
+  // opening rims are dressed by the swept moldings instead. The plate is now
+  // thick (front → deep back) so each hole is a real reveal.
   const plate = new THREE.Shape(
-    ensureWinding(arcPoints(0, 0, ROSE.plateRadius, 0, TAU, 128).slice(0, -1), true),
+    ensureWinding(arcPoints(0, 0, ROSE.plateRadius, 0, TAU, 160).slice(0, -1), true),
   )
   for (const o of openings) {
     plate.holes.push(new THREE.Path(ensureWinding(o.points.map((p) => p.clone()), false)))
@@ -230,20 +321,17 @@ export function buildRoseGeometries(): {
   stoneGeometry.translate(0, 0, ROSE.plateBack)
 
   // Carved profile (chamfer, fillet, twin ribs) swept around every opening,
-  // plus raised hood moldings along the first-order arches and three plain
-  // concentric ring ribs — the heavier orders of tracery that give the
-  // framework its layered, carved density.
+  // plus the first-order hood moldings over the outer band's enclosing
+  // arches, and the concentric archivolt rolls on the thick outer rim.
   const profile = buildMoldingProfile(ROSE.plateFront)
   const hood = buildHoodProfile(ROSE.plateFront, 1)
-  const hoodSmall = buildHoodProfile(ROSE.plateFront, 0.7)
+  const archivoltProfile = buildHoodProfile(ROSE.plateFront, 1.5)
   const ringCircle = (r: number) =>
-    ensureWinding(arcPoints(0, 0, r, 0, TAU, 160).slice(0, -1), true)
+    ensureWinding(arcPoints(0, 0, r, 0, TAU, 200).slice(0, -1), true)
   const moldingGeometry = mergeGeometries([
     ...openings.map((o) => sweepMolding(o.points, profile)),
-    ...hoodOutlines.map((pts, i) => sweepMolding(pts, i < ROSE.band1.count ? hood : hoodSmall)),
-    sweepMolding(ringCircle(1.08), hood),
-    sweepMolding(ringCircle(2.82), hood),
-    sweepMolding(ringCircle(4.55), hood),
+    ...hoodOutlines.map((pts) => sweepMolding(pts, hood)),
+    ...ROSE.archivolt.map((r) => sweepMolding(ringCircle(r), archivoltProfile)),
   ])!
 
   // Splayed (conical) reveal stepping the thick wall down to the tracery rim.
@@ -284,16 +372,21 @@ const zFace = ROSE.stoneDepth / 2 + 0.05
 
 export const roseAnchors: Record<string, [number, number, number]> = {
   oculus: [0, 0, zFace],
-  // mullion between band-1 lights 3 and 4, i.e. the spoke at 90° (top)
-  mullion: [0, (ROSE.band1.rIn + ROSE.band1.rSpring) / 2 + 0.15, zFace],
-  // band-1 trefoil light centred at 281.25° (lower right, clear of the panel)
-  trefoil: (() => {
-    const p = polar((12.5 / 16) * TAU, 2.05)
+  // a radial mullion: the top spoke (90°), between the oculus and band A
+  mullion: (() => {
+    const p = polar(Math.PI / 2, (ROSE.bandA.rIn + ROSE.oculus.foilRadius + 0.4))
     return [p.x, p.y, zFace] as [number, number, number]
   })(),
-  // band-2 glass pane centred at 39.375° (upper right)
+  // a cusped middle-order light (band C), lower right, clear of the panel
+  trefoil: (() => {
+    const bay = TAU / ROSE.spokes
+    const p = polar(13.5 * bay, (ROSE.bandC.rIn + ROSE.bandC.rApex) / 2)
+    return [p.x, p.y, zFace] as [number, number, number]
+  })(),
+  // an outer sub-lancet glass pane (band D), upper right
   pane: (() => {
-    const p = polar((3.5 / 32) * TAU, 3.6)
+    const bay = TAU / ROSE.spokes
+    const p = polar(2.25 * bay, (ROSE.bandD.sub.rIn + ROSE.bandD.sub.rApex) / 2)
     return [p.x, p.y, zFace] as [number, number, number]
   })(),
 }
