@@ -34,9 +34,9 @@ export function Effects() {
         worldProximityThreshold={0.5}
         worldProximityFalloff={0.2}
       />
-      <Bloom mipmapBlur luminanceThreshold={0.42} luminanceSmoothing={0.28} intensity={0.7} />
+      <Bloom mipmapBlur luminanceThreshold={0.22} luminanceSmoothing={0.3} intensity={1.15} radius={0.85} />
       <primitive object={edgeBlur} />
-      <Vignette eskil={false} offset={0.22} darkness={0.52} />
+      <Vignette eskil={false} offset={0.18} darkness={0.68} />
     </EffectComposer>
   )
 }

@@ -14,7 +14,7 @@ export const scenes: SceneDef[] = [
     Component: RoseWindow,
     poseTight: { position: [0, 0, 3.4], lookAt: [0, 0, 0], fov: 36 },
     poseWide: { position: [1.7, -1.0, 16.6], lookAt: [0, 0, 0], fov: 36 },
-    background: '#0d0f18',
+    background: '#040406',
     callouts: [
       { label: sections[0].calloutLabels[0], anchor: roseAnchors.oculus, labelOffset: [0.17, 0.2] },
       { label: sections[0].calloutLabels[1], anchor: roseAnchors.mullion, labelOffset: [0.13, -0.14] },

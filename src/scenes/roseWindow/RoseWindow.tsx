@@ -48,7 +48,7 @@ export function RoseWindow() {
     return m
   }, [])
   const glassMaterials = useMemo(
-    () => GLASS_PALETTE.map((hex, i) => makeStainedGlass(hex, 1.5 + (i % 4) * 0.22)),
+    () => GLASS_PALETTE.map((hex, i) => makeStainedGlass(hex, 2.2 + (i % 4) * 0.32)),
     [],
   )
   const panes = useMemo(
@@ -75,8 +75,11 @@ export function RoseWindow() {
           position={[0, 0, ROSE.glassZ]}
         />
       ))}
-      {/* faint cool spill, as if daylight were coming through the glass */}
-      <pointLight position={[0, 0, 6]} intensity={14} color="#8fa3e8" distance={22} decay={2} />
+      {/* scattered glow bouncing off the glass onto the facing stone —
+          sits just in front of the window, close and falling off fast so
+          it rim-lights the moldings and reveal without flooding the nave */}
+      <pointLight position={[0, 0, 1.1]} intensity={1.8} color="#5f7fd6" distance={4} decay={2} />
+      <pointLight position={[0, 0, 0.9]} intensity={0.45} color="#c4552e" distance={3} decay={2} />
     </group>
   )
 }

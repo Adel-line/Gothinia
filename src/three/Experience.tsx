@@ -35,10 +35,12 @@ export function Experience() {
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       camera={{ fov: 36, near: 0.1, far: 120, position: [0, 0, 3.4] }}
     >
-      {/* diffuse daylight: raking warm key models the relief, cool sky fill */}
-      <hemisphereLight args={['#b7c4e4', '#241c12', 0.32]} />
-      <directionalLight position={[-9, 8, 7]} intensity={1.9} color="#ffedd2" />
-      <directionalLight position={[8, -4, 9]} intensity={0.28} color="#a9b8e0" />
+      {/* interior nave: almost no ambient daylight on the stone — the glass
+          is the only real light source, the masonry reads as near-silhouette
+          with just enough fill for SSAO to model the carving */}
+      <hemisphereLight args={['#3a4562', '#0a0806', 0.1]} />
+      <directionalLight position={[-9, 8, 7]} intensity={0.1} color="#6b7ca8" />
+      <directionalLight position={[8, -4, 9]} intensity={0.05} color="#4a5578" />
       <CameraRig />
       <ActiveScene />
       <Effects />
