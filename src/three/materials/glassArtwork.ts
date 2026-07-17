@@ -113,6 +113,9 @@ export function makeRosePaneMaterial(art: GlassArtwork, frame: PaneFrame): THREE
     metalness: 0.0,
     side: THREE.DoubleSide,
   })
+  // Glass emits from the shader, so its material emissive stays black; tag it
+  // so the shadow pass excludes it (it must not cast the sun into darkness).
+  mat.userData.isGlass = true
 
   const uniforms = {
     uCenter: { value: new THREE.Vector2(frame.center[0], frame.center[1]) },

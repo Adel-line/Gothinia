@@ -49,7 +49,14 @@ function ShadowSetup() {
       m.userData.__shadowInit = true
       const mat = m.material as THREE.MeshStandardMaterial | undefined
       const emissive = mat?.emissive
-      const isGlass = !!emissive && emissive.r + emissive.g + emissive.b > 0.001
+      // Glass must never cast or receive: it is the light source, not stone.
+      // Detect it explicitly (materials tag themselves) with a non-black
+      // emissive as a fallback — the artwork glass emits from the shader, so
+      // its material emissive is black and the heuristic alone would miss it.
+      const isGlass =
+        !!mat &&
+        (mat.userData?.isGlass === true ||
+          (!!emissive && emissive.r + emissive.g + emissive.b > 0.001))
       const opaqueStone = !!mat && !mat.transparent && !isGlass
       m.castShadow = opaqueStone
       m.receiveShadow = opaqueStone

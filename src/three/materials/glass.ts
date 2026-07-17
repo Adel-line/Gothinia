@@ -48,6 +48,7 @@ export function makeStainedGlass(hex: string, strength: number): THREE.MeshStand
     metalness: 0.0,
     side: THREE.DoubleSide,
   })
+  mat.userData.isGlass = true
 
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
