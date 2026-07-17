@@ -56,28 +56,43 @@ export const ROSE = {
   /** N-fold symmetry. Sixteen radial mullions (spokes). */
   spokes: 16,
 
-  oculus: { foils: 8, centerDist: 0.42, foilRadius: 0.3 },
+  // Concentric orders are spaced so a clear annulus of solid stone separates
+  // every ring from its neighbours: each band's apex/sill and each node ring
+  // are kept ~0.23 apart (hole-to-hole), so the swept moldings read as
+  // distinct carved bars instead of a tangle.
+  //
+  //   order        radial hole span      stone gap to next
+  //   oculus       0.00 – 0.68
+  //   (gap 0.27)
+  //   bandA        0.95 – 1.60
+  //   (gap 0.23)   node1 ring 1.83 – 2.17
+  //   (gap 0.23)   bandC 2.40 – 3.05
+  //   (gap 0.24)   node2 ring 3.29 – 3.61
+  //   (gap 0.24)   bandD 3.85 – 4.52
+  //   (gap ~0.10)  archivolt rolls on the rim, inside plateRadius 4.9
+  oculus: { foils: 8, centerDist: 0.4, foilRadius: 0.28 },
 
   // inner wreath of petal lights
-  bandA: { rIn: 1.08, rSpring: 1.55, rApex: 2.02, mullionWidth: 0.12, cusp: 0.05 },
-  // first node ring — quatrefoils on the spokes
-  node1: { r: 2.3, foils: 4, centerDist: 0.1, foilRadius: 0.14, phase: Math.PI / 4 },
+  bandA: { rIn: 0.95, rSpring: 1.3, rApex: 1.6, mullionWidth: 0.12, cusp: 0.05 },
+  // first node ring — quatrefoils on the spokes (extent ~0.17)
+  node1: { r: 2.0, foils: 4, centerDist: 0.07, foilRadius: 0.1, phase: Math.PI / 4 },
   // middle order lights
-  bandC: { rIn: 2.54, rSpring: 3.08, rApex: 3.5, mullionWidth: 0.13, cusp: 0.06 },
-  // second node ring — sexfoils on the spokes
-  node2: { r: 3.72, foils: 6, centerDist: 0.09, foilRadius: 0.11, phase: 0 },
+  bandC: { rIn: 2.4, rSpring: 2.8, rApex: 3.05, mullionWidth: 0.13, cusp: 0.06 },
+  // second node ring — sexfoils on the spokes (extent ~0.16)
+  node2: { r: 3.45, foils: 6, centerDist: 0.06, foilRadius: 0.1, phase: 0 },
   // outer order: first-order arches subdivided into twin sub-lancets
   bandD: {
-    rIn: 3.92,
-    rSpring: 4.32,
-    rApex: 4.6,
+    rIn: 3.85,
+    rSpring: 4.18,
+    rApex: 4.52,
     mullionWidth: 0.15,
     subHalf: 0.05,
-    sub: { rIn: 3.97, rSpring: 4.14, rApex: 4.36, cusp: 0.04 },
-    quatrefoil: { r: 4.46, foils: 4, centerDist: 0.075, foilRadius: 0.085, phase: 0 },
+    sub: { rIn: 3.9, rSpring: 4.06, rApex: 4.26, cusp: 0.04 },
+    quatrefoil: { r: 4.36, foils: 4, centerDist: 0.05, foilRadius: 0.07, phase: 0 },
   },
-  // molded archivolt rolls carried on the thick outer rim
-  archivolt: [4.7, 4.8],
+  // molded archivolt rolls carried on the thick outer rim, clear of the outer
+  // lights (4.52) and inside the splay reveal (4.86)
+  archivolt: [4.62, 4.74],
 }
 
 export interface Opening {
@@ -323,9 +338,11 @@ export function buildRoseGeometries(): {
   // Carved profile (chamfer, fillet, twin ribs) swept around every opening,
   // plus the first-order hood moldings over the outer band's enclosing
   // arches, and the concentric archivolt rolls on the thick outer rim.
-  const profile = buildMoldingProfile(ROSE.plateFront)
-  const hood = buildHoodProfile(ROSE.plateFront, 1)
-  const archivoltProfile = buildHoodProfile(ROSE.plateFront, 1.5)
+  // Narrow the rim profile a touch so the swept roll sits on the slender bars
+  // between the now well-separated openings rather than overrunning them.
+  const profile = buildMoldingProfile(ROSE.plateFront).map((r) => ({ ...r, d: r.d * 0.7 }))
+  const hood = buildHoodProfile(ROSE.plateFront, 0.85)
+  const archivoltProfile = buildHoodProfile(ROSE.plateFront, 1.1)
   const ringCircle = (r: number) =>
     ensureWinding(arcPoints(0, 0, r, 0, TAU, 200).slice(0, -1), true)
   const moldingGeometry = mergeGeometries([
