@@ -90,9 +90,10 @@ export const ROSE = {
     sub: { rIn: 3.9, rSpring: 4.06, rApex: 4.26, cusp: 0.04 },
     quatrefoil: { r: 4.36, foils: 4, centerDist: 0.05, foilRadius: 0.07, phase: 0 },
   },
-  // molded archivolt rolls carried on the thick outer rim, clear of the outer
-  // lights (4.52) and inside the splay reveal (4.86)
-  archivolt: [4.62, 4.74],
+  // molded archivolt rolls carried on the thick outer rim — spaced so the two
+  // rolls abut as a clean double order (~0.13 apart for their ~0.065 reach),
+  // clear of the outer lights (4.52) and inside the splay reveal (4.86)
+  archivolt: [4.6, 4.73],
 }
 
 export interface Opening {
@@ -335,18 +336,32 @@ export function buildRoseGeometries(): {
   })
   stoneGeometry.translate(0, 0, ROSE.plateBack)
 
-  // Carved profile (chamfer, fillet, twin ribs) swept around every opening,
-  // plus the first-order hood moldings over the outer band's enclosing
-  // arches, and the concentric archivolt rolls on the thick outer rim.
-  // Narrow the rim profile a touch so the swept roll sits on the slender bars
-  // between the now well-separated openings rather than overrunning them.
-  const profile = buildMoldingProfile(ROSE.plateFront).map((r) => ({ ...r, d: r.d * 0.7 }))
-  const hood = buildHoodProfile(ROSE.plateFront, 0.85)
-  const archivoltProfile = buildHoodProfile(ROSE.plateFront, 1.1)
+  // Carved moldings, dressed by ORDER of tracery so no roll ever overruns its
+  // stone bar (a member's roll reaches at most half its mullion, so where two
+  // members share a mullion the half-rolls meet cleanly at the centreline as
+  // ONE roll — never two independent rolls crossing). Three tiers:
+  //   · oculus       — the fullest roll (focal, isolated by wide stone)
+  //   · primary      — band A / C lights and the band-D enclosing arches
+  //   · subordinate  — foiled nodes, twin sub-lancets, head quatrefoils: a
+  //                    slim chamfer, so cusps stay legible and the sub-lights
+  //                    read as dressed openings within the hooded arch
+  // (buildMoldingProfile's full reach is ~0.16; the scales below set the reach
+  // to ~0.08 / ~0.06 / ~0.032 respectively — all within half the local bar.)
+  const base = buildMoldingProfile(ROSE.plateFront)
+  const scaled = (s: number) => base.map((r) => ({ ...r, d: r.d * s }))
+  const oculusProfile = scaled(0.5)
+  const mainProfile = scaled(0.38)
+  const slimProfile = scaled(0.2)
+  const hood = buildHoodProfile(ROSE.plateFront, 0.46)
+  const archivoltProfile = buildHoodProfile(ROSE.plateFront, 0.5)
+  const isPrimary = (o: Opening) => o.ring === 1 || o.ring === 3
+  const isSubordinate = (o: Opening) => o.ring === 2 || o.ring === 4 || o.ring === 5 || o.ring === 6
   const ringCircle = (r: number) =>
     ensureWinding(arcPoints(0, 0, r, 0, TAU, 200).slice(0, -1), true)
   const moldingGeometry = mergeGeometries([
-    ...openings.map((o) => sweepMolding(o.points, profile)),
+    ...openings.filter((o) => o.ring === 0).map((o) => sweepMolding(o.points, oculusProfile)),
+    ...openings.filter(isPrimary).map((o) => sweepMolding(o.points, mainProfile)),
+    ...openings.filter(isSubordinate).map((o) => sweepMolding(o.points, slimProfile)),
     ...hoodOutlines.map((pts) => sweepMolding(pts, hood)),
     ...ROSE.archivolt.map((r) => sweepMolding(ringCircle(r), archivoltProfile)),
   ])!
