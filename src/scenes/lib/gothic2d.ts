@@ -102,18 +102,40 @@ export function pointedHead(
   const branch1 = sampleBranch(-e, 0, alpha, 16)
   // falling branch: apex -> sEnd (local -h,0), centred at (+e, 0)
   const branch2 = sampleBranch(e, Math.PI - alpha, Math.PI, 16)
+  const smooth = [...branch1, ...branch2.slice(1)]
 
-  if (cuspDepth > 0) {
-    const throat = local(0, H * 0.3) // cusps point at the throat of the light
-    for (const branch of [branch1, branch2]) {
-      const i = Math.floor(branch.length / 2)
-      const q = branch[i]
-      const inward = throat.clone().sub(q).normalize()
-      branch[i] = q.clone().addScaledVector(inward, cuspDepth)
+  if (cuspDepth <= 0) return smooth
+
+  // Scallop the smooth head into a foiled head: N round lobes that meet at
+  // SHARP, symmetric, evenly-spaced cusps — a stonecutter's trefoil, not a
+  // single blunt dent. The apex sits at the crest of the middle lobe so the
+  // arch stays pointed; cusps fall on the springing sides.
+  const nFoils = 3
+  const throat = local(0, H * 0.35) // cusps point in toward the light
+  const cum = [0]
+  for (let i = 1; i < smooth.length; i++) cum.push(cum[i - 1] + smooth[i].distanceTo(smooth[i - 1]))
+  const L = cum[cum.length - 1]
+  const at = (t: number): THREE.Vector2 => {
+    const target = THREE.MathUtils.clamp(t, 0, 1) * L
+    let i = 1
+    while (i < cum.length - 1 && cum[i] < target) i++
+    const f = (target - cum[i - 1]) / Math.max(cum[i] - cum[i - 1], 1e-9)
+    return smooth[i - 1].clone().lerp(smooth[i], f)
+  }
+  const gap = 0.05 / nFoils // arc-length half-width of each cusp notch
+  const perLobe = 7
+  const out: THREE.Vector2[] = []
+  for (let lobe = 0; lobe < nFoils; lobe++) {
+    const a = lobe === 0 ? 0 : lobe / nFoils + gap
+    const b = lobe === nFoils - 1 ? 1 : (lobe + 1) / nFoils - gap
+    for (let s = 0; s <= perLobe; s++) out.push(at(a + ((b - a) * s) / perLobe))
+    if (lobe < nFoils - 1) {
+      const p = at((lobe + 1) / nFoils)
+      const inward = throat.clone().sub(p).normalize()
+      out.push(p.clone().addScaledVector(inward, cuspDepth)) // sharp inward cusp tip
     }
   }
-
-  return [...branch1, ...branch2.slice(1)]
+  return out
 }
 
 /**
