@@ -2,31 +2,8 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { buildRoseGeometries, ROSE, type Opening } from './tracery'
 import { makeLimestone } from '../../three/materials/limestone'
-import { makeStainedGlass } from '../../three/materials/glass'
-
-/**
- * Sainte-Chapelle jewel tones — blue and red dominate, as they do in the
- * actual glazing, with gold/green/violet accents.
- */
-const GLASS_PALETTE = [
-  '#1c3fa8', // cobalt
-  '#941226', // ruby
-  '#16327f', // deep blue
-  '#a01327', // garnet
-  '#d29a2b', // gold
-  '#186a45', // emerald
-  '#55307f', // violet
-  '#1c3fa8', // cobalt again — weights the mix blue
-  '#941226',
-]
-
-/** Deterministic per-pane colour pick (mulberry-style integer hash). */
-function paletteIndex(ring: number, index: number): number {
-  let h = (ring * 73856093) ^ (index * 19349663)
-  h = Math.imul(h ^ (h >>> 13), 1274126177)
-  h ^= h >>> 16
-  return Math.abs(h) % GLASS_PALETTE.length
-}
+import { assignRoseArtwork } from './glassArt'
+import { makeRosePaneMaterial, type PaneFrame } from '../../three/materials/glassArtwork'
 
 function glassGeometry(opening: Opening): THREE.ShapeGeometry {
   // expand slightly about the opening centre so pane edges hide inside stone
@@ -34,6 +11,16 @@ function glassGeometry(opening: Opening): THREE.ShapeGeometry {
     p.clone().sub(opening.center).multiplyScalar(1.05).add(opening.center),
   )
   return new THREE.ShapeGeometry(new THREE.Shape(pts))
+}
+
+/** Local frame for a pane's artwork: centre, radial orientation, size. */
+function paneFrame(o: Opening): PaneFrame {
+  let radius = 1e-3
+  for (const p of o.points) radius = Math.max(radius, p.distanceTo(o.center))
+  const atOrigin = o.center.lengthSq() < 1e-6
+  // rotate so the motif's local +Y points radially outward toward the rim
+  const angle = atOrigin ? 0 : Math.atan2(o.center.y, o.center.x) - Math.PI / 2
+  return { center: [o.center.x, o.center.y], angle, radius }
 }
 
 export function RoseWindow() {
@@ -53,15 +40,13 @@ export function RoseWindow() {
     () => makeLimestone({ color: '#8d7c64', roughness: 0.82, metalness: 0.0, bump: 0.09 }),
     [],
   )
-  const glassMaterials = useMemo(
-    () => GLASS_PALETTE.map((hex, i) => makeStainedGlass(hex, 2.2 + (i % 4) * 0.32)),
-    [],
-  )
+  // Each pane is authored as a handcrafted GlassArtwork recipe and rendered by
+  // its own compositor material (all sharing one compiled program).
   const panes = useMemo(
     () =>
       openings.map((o) => ({
         geometry: glassGeometry(o),
-        material: paletteIndex(o.ring, o.index),
+        material: makeRosePaneMaterial(assignRoseArtwork(o), paneFrame(o)),
         key: `${o.ring}-${o.index}`,
       })),
     [openings],
@@ -77,7 +62,7 @@ export function RoseWindow() {
         <mesh
           key={p.key}
           geometry={p.geometry}
-          material={glassMaterials[p.material]}
+          material={p.material}
           position={[0, 0, ROSE.glassZ]}
         />
       ))}
