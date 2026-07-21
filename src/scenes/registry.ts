@@ -15,7 +15,12 @@ export const scenes: SceneDef[] = [
     content: sections[0],
     Component: RoseWindow,
     poseTight: { position: [0, 0, 3.4], lookAt: [0, 0, 0], fov: 36 },
-    poseWide: { position: [1.7, -1.0, 16.6], lookAt: [0, 0, 0], fov: 36 },
+    // Pulled back far enough that the window's own dark circular wall-reveal
+    // (radius ~5.56) actually recedes inside the frame instead of nearly
+    // filling it edge-to-edge (the old z=16.6 left half-height view ~5.43 —
+    // smaller than the reveal itself) — otherwise it just sits centred and
+    // unshrinking for the whole back half of the scroll.
+    poseWide: { position: [2.7, -1.6, 26.6], lookAt: [0, 0, 0], fov: 36 },
     background: '#060403',
     callouts: [
       { label: sections[0].calloutLabels[0], anchor: roseAnchors.oculus, labelOffset: [0.17, 0.2] },
