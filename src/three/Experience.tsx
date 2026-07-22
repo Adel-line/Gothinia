@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { scenes } from '../scenes/registry'
@@ -15,10 +15,19 @@ import { LightShafts } from './effects/LightShafts'
  */
 function ActiveScene() {
   const [active, setActive] = useState(0)
+  const groups = useRef<(THREE.Group | null)[]>([])
 
   useFrame(() => {
     const { index } = scenePhase(scrollState.progress, scenes.length)
     const clamped = Math.min(index, scenes.length - 1)
+    // Visibility must change in the render loop, not on React's following
+    // render. Otherwise CameraRig has already moved to the incoming pose while
+    // the outgoing rose plate is still mounted for a frame, where it reads as
+    // a dark circular disc in the centre of the Milan scene.
+    for (let i = 0; i < groups.current.length; i++) {
+      const group = groups.current[i]
+      if (group) group.visible = i === clamped
+    }
     if (clamped !== active) setActive(clamped)
   })
 
@@ -27,7 +36,17 @@ function ActiveScene() {
     <>
       <color attach="background" args={[def.background]} />
       <fogExp2 attach="fog" args={[def.background, 0.045]} />
-      <def.Component />
+      {scenes.map((scene, index) => (
+        <group
+          key={scene.content.id}
+          ref={(group) => {
+            groups.current[index] = group
+          }}
+          visible={index === 0}
+        >
+          <scene.Component />
+        </group>
+      ))}
     </>
   )
 }
