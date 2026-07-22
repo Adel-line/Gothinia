@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Bloom, EffectComposer, SSAO, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, SSAO } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import { EdgeBlurEffect } from './effects/EdgeBlur'
 import { scenes } from '../scenes/registry'
@@ -36,7 +36,6 @@ export function Effects() {
       />
       <Bloom mipmapBlur luminanceThreshold={0.22} luminanceSmoothing={0.3} intensity={1.15} radius={0.85} />
       <primitive object={edgeBlur} />
-      <Vignette eskil={false} offset={0.18} darkness={0.68} />
     </EffectComposer>
   )
 }
