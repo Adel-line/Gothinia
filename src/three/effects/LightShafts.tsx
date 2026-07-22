@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { scenes } from '../../scenes/registry'
@@ -69,47 +69,59 @@ const MILAN_BEAMS: BeamDef[] = [
 ]
 
 export function LightShafts() {
-  const [active, setActive] = useState(0)
-  const mats = useRef<(THREE.ShaderMaterial | null)[]>([])
+  const groups = useRef<(THREE.Group | null)[]>([])
+  const mats = useRef<(THREE.ShaderMaterial | null)[][]>([[], []])
 
   useFrame((state) => {
     const { index } = scenePhase(scrollState.progress, scenes.length)
     const clamped = Math.min(index, scenes.length - 1)
-    if (clamped !== active) setActive(clamped)
+    for (let i = 0; i < groups.current.length; i++) {
+      const group = groups.current[i]
+      if (group) group.visible = i === clamped
+    }
     const t = state.clock.elapsedTime
-    for (const m of mats.current) if (m) m.uniforms.uTime.value = t
+    for (const sceneMats of mats.current) {
+      for (const m of sceneMats) if (m) m.uniforms.uTime.value = t
+    }
   })
 
-  const beams = active === 0 ? ROSE_BEAMS : MILAN_BEAMS
-  mats.current = []
-
   return (
-    <group>
-      {beams.map((b, i) => (
-        <mesh key={i} position={b.position} rotation={b.rotation} renderOrder={10}>
-          <planeGeometry args={b.size} />
-          <shaderMaterial
-            ref={(m) => {
-              mats.current[i] = m as THREE.ShaderMaterial | null
-            }}
-            args={[
-              {
-                uniforms: {
-                  uTime: { value: 0 },
-                  uColor: { value: new THREE.Color(b.color) },
-                  uIntensity: { value: b.intensity },
-                },
-                vertexShader,
-                fragmentShader,
-                transparent: true,
-                depthWrite: false,
-                blending: THREE.AdditiveBlending,
-                side: THREE.DoubleSide,
-              },
-            ]}
-          />
-        </mesh>
+    <>
+      {[ROSE_BEAMS, MILAN_BEAMS].map((beams, sceneIndex) => (
+        <group
+          key={sceneIndex}
+          ref={(group) => {
+            groups.current[sceneIndex] = group
+          }}
+          visible={sceneIndex === 0}
+        >
+          {beams.map((b, i) => (
+            <mesh key={i} position={b.position} rotation={b.rotation} renderOrder={10}>
+              <planeGeometry args={b.size} />
+              <shaderMaterial
+                ref={(m) => {
+                  mats.current[sceneIndex][i] = m as THREE.ShaderMaterial | null
+                }}
+                args={[
+                  {
+                    uniforms: {
+                      uTime: { value: 0 },
+                      uColor: { value: new THREE.Color(b.color) },
+                      uIntensity: { value: b.intensity },
+                    },
+                    vertexShader,
+                    fragmentShader,
+                    transparent: true,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                  },
+                ]}
+              />
+            </mesh>
+          ))}
+        </group>
       ))}
-    </group>
+    </>
   )
 }
