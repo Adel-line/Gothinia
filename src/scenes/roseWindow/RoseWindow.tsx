@@ -69,8 +69,8 @@ export function RoseWindow() {
       {/* scattered glow bouncing off the glass onto the facing stone —
           sits just in front of the window, close and falling off fast so
           it rim-lights the moldings and reveal without flooding the nave */}
-      <pointLight position={[0, 0, 1.1]} intensity={2.2} color="#d9954e" distance={5} decay={2} />
-      <pointLight position={[0, 0, 0.9]} intensity={0.5} color="#7a86c8" distance={3} decay={2} />
+      <pointLight position={[0, 0, 1.1]} intensity={0.35} color="#d9954e" distance={5} decay={2} />
+      <pointLight position={[0, 0, 0.9]} intensity={0.08} color="#7a86c8" distance={3} decay={2} />
     </group>
   )
 }
