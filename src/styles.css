@@ -27,6 +27,90 @@ body {
   pointer-events: none;
 }
 
+/* ---------- title frame (opening header) ---------- */
+
+.title-frame {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+/* soft atmospheric darkening + a faint warm haze low on the frame, so the
+   title reads cleanly over the canvas the way it does over the mist */
+.title-frame-fog {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 78%, rgba(120, 92, 46, 0.16), transparent 55%),
+    radial-gradient(140% 120% at 50% 42%, transparent 40%, rgba(6, 5, 4, 0.72) 100%),
+    linear-gradient(rgba(8, 7, 6, 0.55), rgba(6, 5, 4, 0.82));
+}
+
+.title-frame-inner {
+  position: relative;
+  padding: 0 24px;
+  max-width: 1100px;
+}
+
+.title-frame-kicker {
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: clamp(11px, 1vw, 13px);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: #a8894e;
+  margin-bottom: clamp(18px, 3vw, 30px);
+}
+
+.title-frame-title {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-variant: small-caps;
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: 0.04em;
+  color: #ece7da;
+  font-size: clamp(48px, 10vw, 128px);
+}
+
+.title-frame-title span {
+  display: block;
+}
+
+.title-frame-subtitle {
+  margin: clamp(24px, 4vw, 42px) auto 0;
+  max-width: 46ch;
+  font-style: italic;
+  font-size: clamp(15px, 1.5vw, 20px);
+  line-height: 1.7;
+  color: #b7ad97;
+}
+
+.title-frame-cue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: clamp(40px, 6vw, 72px);
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: rgba(232, 226, 212, 0.62);
+}
+
+.title-frame-cue-line {
+  width: 1px;
+  height: 46px;
+  background: linear-gradient(rgba(232, 226, 212, 0.6), transparent);
+  transform-origin: top;
+  animation: cue-drop 2.4s ease-in-out infinite;
+}
+
 /* ---------- overlay ---------- */
 
 .overlay {
@@ -116,30 +200,6 @@ body {
 }
 
 /* ---------- scroll cue / debug ---------- */
-
-.scroll-cue {
-  position: absolute;
-  bottom: 34px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-  font-size: 11px;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: rgba(232, 226, 212, 0.75);
-}
-
-.scroll-cue-line {
-  width: 1px;
-  height: 42px;
-  background: linear-gradient(rgba(232, 226, 212, 0.75), transparent);
-  animation: cue-drop 2s ease-in-out infinite;
-  transform-origin: top;
-}
 
 @keyframes cue-drop {
   0% { transform: scaleY(0); }
