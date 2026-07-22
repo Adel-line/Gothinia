@@ -9,34 +9,39 @@ import {
   multifoilPoints,
   pointedHead,
   polar,
-  sphericalTriangle,
 } from '../lib/gothic2d'
 
 /**
- * Procedural Rayonnant rose window, rebuilt after the north transept rose of
- * Notre-Dame de Paris (and the glazing of Sainte-Chapelle). The point of the
- * rebuild is *architectural hierarchy*: a real rose is not one repeated motif
- * on a wheel, it is a sequence of concentric ORDERS that grow as they radiate,
- * threaded onto radial mullions and pinned at every ring by foiled circles.
+ * Procedural Rayonnant rose window, after the south-transept rose of
+ * Notre-Dame de Paris / Saint-Denis (with subdivided lights after Strasbourg,
+ * and the glazing of Sainte-Chapelle). The governing idea is a real 13th-c.
+ * rose's geometry: a dense radial fan of pointed cusped lancets that DOUBLES
+ * its spoke count at a string-course, pinned at every ring by foiled circles,
+ * with every gap filled — a skeletal even net of stone, glass subordinate.
  *
- * Reading from the centre outward, on a strict sixteen-fold division:
+ * Reading from the centre outward, sixteen-fold doubling to thirty-two
+ * (see the ring table on ROSE below for the exact radii):
  *
- *   0  central octofoil OCULUS
- *   A  sixteen small trefoil-headed PETAL lights (the inner wreath)
- *   1  a ring of sixteen cusped QUATREFOIL medallions, one on every radial
- *      mullion — the nodes where the spokes cross the first string-course
- *   C  sixteen taller cinquefoil-cusped lights (the middle order)
- *   2  a ring of sixteen SEXFOIL medallions on the mullions
- *   D  sixteen first-order arches, each PROPERLY SUBDIVIDED into twin
- *      trefoil sub-lancets beneath a small quatrefoil — the largest lights
- *      carry the densest tracery, exactly as bar tracery does
- *      + a thick, deep dressed-stone RIM carrying two molded archivolt rolls
+ *   ring 0  central twelve-foil OCULUS rosette
+ *   ring 1  ×16 pointed trefoil-cusped inner lancets
+ *   ring 2  ×16 quatrefoil node medallions on the spokes
+ *   ring 3  ×32 twin sub-lancets  ┐ the middle order: one tall pointed light
+ *   ring 4  ×16 sexfoil head-foils┘ per bay, SUBDIVIDED by its own bar tracery
+ *           beneath a hooded enclosing arch — arches nested in arches
+ *   ring 5  ×16 sexfoil node medallions — the DOUBLING string-course
+ *   ring 6  ×32 narrow pointed trefoil-cusped lancets — the outer fan
+ *   ring 7  ×32 foiled-circle medallions — the outer wreath
+ *   ring 8  ×48 small cusped trefoils filling every spandrel (32 between the
+ *           wreath circles + 16 on the doubling course)
+ *   + two molded archivolt rolls on the rim
  *
- * Everything is still one pierced stone plate with the openings cut as holes,
- * so the mullions, ring courses and spandrels are the negative space between
- * lights — genuine plate/bar tracery logic, not a drawn pattern. The plan is
- * built in 2D (window plane = XY, facing +Z) and extruded; carved moldings are
- * swept around every opening and along the heavier orders.
+ * Everything is one pierced stone plate with the openings cut as holes, so the
+ * mullions, ring-courses and spandrels are the negative space between lights —
+ * genuine plate/bar tracery logic, not a drawn pattern. Openings are packed to
+ * a constant thin bar and are guaranteed pairwise-disjoint and simple (no
+ * overlaps, no self-intersections), so each hole triangulates and is glazed.
+ * The plan is built in 2D (window plane = XY, facing +Z) and extruded; carved
+ * moldings are swept around every opening and along the heavier orders.
  */
 
 // ---------------------------------------------------------------------------
@@ -110,15 +115,19 @@ export const ROSE = {
   // ring 6 — outer fan of narrow pointed lancets (two per bay = 32)
   bandD: { rIn: 2.9, rSpring: 3.04, rApex: 3.86, cusp: 0.045 },
 
-  // ring 7 — outer wreath of foiled-circle medallions (32, one per outer light)
-  wreath: { r: 4.21, foils: 4, centerDist: 0.13, foilRadius: 0.185, phase: Math.PI / 4 },
+  // ring 7 — outer wreath of foiled-circle medallions (32, one per outer light).
+  // Oriented RADIALLY (a cusp faces each neighbour) so a real gap opens between
+  // consecutive circles for the spandrel foils to sit in.
+  wreath: { r: 4.21, foils: 4, centerDist: 0.13, foilRadius: 0.185 },
 
-  // ring 8 — cusped spherical-triangle spandrels between wreath circles
-  spandrel: { rInner: 3.9, rOuter: 4.3, halfSpan: 0.46, bulge: 0.2, cusp: 0.14 },
+  // ring 8 — small cusped trefoils dropped into the gaps between the wreath
+  // circles, exactly as the spandrels of a Notre-Dame rose are foiled. Sized
+  // and placed (verified) to clear the wreath on either side and the fan below.
+  spandrel: { r: 4.18, foils: 3, centerDist: 0.06, foilRadius: 0.09 },
 
-  // ring 8 (inner set) — cusped spandrels on the doubling string-course,
-  // pointing outward toward the fan sill from between the sexfoil nodes
-  midSpandrel: { rInner: 2.46, rOuter: 2.86, halfSpan: 0.34, bulge: 0.18, cusp: 0.12 },
+  // ring 8 (inner set) — small cusped trefoils on the doubling string-course,
+  // between the sexfoil nodes where each fresh outer mullion springs
+  midSpandrel: { r: 2.66, foils: 3, centerDist: 0.06, foilRadius: 0.085 },
 
   // molded archivolt rolls carried on the thick outer rim — clear of the wreath
   // (outer edge ~4.46) and inside the splay reveal (4.86)
@@ -303,24 +312,15 @@ export function buildOpenings(): RosePlan {
     )
   }
 
-  // ---- ring 8 (inner set): cusped spherical-triangle spandrels centred BETWEEN
-  // the sexfoil nodes, exactly where each odd outer mullion springs from the
-  // string-course. They fill what would otherwise be a plain stone band and
-  // make the 16→32 doubling read as a springing of fresh cusped members.
+  // ---- ring 8 (inner set): small cusped trefoils centred BETWEEN the sexfoil
+  // nodes, exactly where each odd outer mullion springs from the string-course.
+  // They fill what would otherwise be a plain stone band and make the 16→32
+  // doubling read as a springing of fresh cusped members. One lobe points
+  // outward (toward the fan), the classic spandrel foil.
   const ms = ROSE.midSpandrel
   for (let i = 0; i < N; i++) {
     const t = (i + 0.5) * bay
-    const corners: [THREE.Vector2, THREE.Vector2, THREE.Vector2] = [
-      polar(t, ms.rOuter),
-      polar(t - bay * ms.halfSpan, ms.rInner),
-      polar(t + bay * ms.halfSpan, ms.rInner),
-    ]
-    openings.push({
-      points: sphericalTriangle(corners, ms.bulge, ms.cusp),
-      center: polar(t, (ms.rInner + ms.rOuter) / 2),
-      ring: 8,
-      index: 100 + i,
-    })
+    openings.push(medallion(t, ms.r, ms.foils, ms.centerDist, ms.foilRadius, t, 8, 100 + i))
   }
 
   // ---- ring 6: outer fan of narrow pointed trefoil-cusped lancets. Thirty-two
@@ -344,31 +344,21 @@ export function buildOpenings(): RosePlan {
   }
 
   // ---- ring 7: outer wreath of foiled-circle medallions, one crowning each
-  // outer light (centred on the mid-angle of every outer bay)
+  // outer light (centred on the mid-angle of every outer bay), oriented
+  // radially so a cusp — not a lobe — faces each neighbour
   const w = ROSE.wreath
   for (let k = 0; k < N2; k++) {
-    openings.push(
-      medallion(k * bay2 + bay2 / 2, w.r, w.foils, w.centerDist, w.foilRadius, w.phase, 7, k),
-    )
+    const t = k * bay2 + bay2 / 2
+    openings.push(medallion(t, w.r, w.foils, w.centerDist, w.foilRadius, t + Math.PI / 4, 7, k))
   }
 
-  // ---- ring 8: cusped spherical-triangle spandrels between the wreath
-  // circles (centred on the outer mullion angles), filling what would
-  // otherwise be blank stone between the round medallions
+  // ---- ring 8: small cusped trefoils dropped into the gaps between the wreath
+  // circles (centred on the outer mullion angles), filling what would otherwise
+  // be blank stone between the round medallions. One lobe points inward.
   const sp = ROSE.spandrel
   for (let k = 0; k < N2; k++) {
     const t = k * bay2
-    const corners: [THREE.Vector2, THREE.Vector2, THREE.Vector2] = [
-      polar(t, sp.rInner),
-      polar(t + bay2 * sp.halfSpan, sp.rOuter),
-      polar(t - bay2 * sp.halfSpan, sp.rOuter),
-    ]
-    openings.push({
-      points: sphericalTriangle(corners, sp.bulge, sp.cusp),
-      center: polar(t, (sp.rInner + sp.rOuter) / 2),
-      ring: 8,
-      index: k,
-    })
+    openings.push(medallion(t, sp.r, sp.foils, sp.centerDist, sp.foilRadius, t + Math.PI, 8, k))
   }
 
   return { openings, hoodOutlines }
