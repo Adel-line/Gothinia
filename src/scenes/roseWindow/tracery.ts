@@ -41,6 +41,33 @@ import {
 // ---------------------------------------------------------------------------
 // Radial layout (world units; the rose is ~9.8 units across the glazed field)
 // ---------------------------------------------------------------------------
+const N_SPOKES = 16
+const BAY = TAU / N_SPOKES
+const HALF_BAY = BAY / 2 // full-bay lights: bandA, bandC, bandD's hood
+const QUARTER_BAY = BAY / 4 // bandD's twin sub-lancets (each spans half a bay)
+
+/**
+ * Apex radius for a two-centre pointed arch springing at `rSpring`, whose
+ * jambs are `phi` apart, tuned so H/h = `ratio` (H = apex rise, h =
+ * rSpring·sin(phi) = the half-span at the springline — see pointedHead() in
+ * gothic2d.ts). Deriving rApex this way — instead of picking it by eye —
+ * guarantees a true Gothic point rather than a near-semicircular drop arch:
+ * h grows with radius in the wider outer bays, so a fixed *rise* that looks
+ * right on an inner band silently flattens out further out; a fixed *ratio*
+ * does not.
+ */
+function archApex(rSpring: number, phi: number, ratio: number): number {
+  return rSpring * Math.cos(phi) + ratio * rSpring * Math.sin(phi)
+}
+
+const RATIO_MAIN = 1.32 // bandA / bandC / bandD hood — one matched family of lancets
+const RATIO_SUB = 1.55 // bandD's twin sub-lancets — taller and more sharply pointed
+
+const bandARSpring = 0.96
+const bandCRSpring = 2.079
+const bandDRSpring = 3.514
+const bandDSubRSpring = 3.528
+
 export const ROSE = {
   plateRadius: 4.9,
   wallHoleRadius: 5.56,
@@ -54,46 +81,66 @@ export const ROSE = {
   glassZ: -0.12,
 
   /** N-fold symmetry. Sixteen radial mullions (spokes). */
-  spokes: 16,
+  spokes: N_SPOKES,
 
-  // Concentric orders are spaced so a clear annulus of solid stone separates
-  // every ring from its neighbours: each band's apex/sill and each node ring
-  // are kept ~0.23 apart (hole-to-hole), so the swept moldings read as
-  // distinct carved bars instead of a tangle.
+  // Concentric orders are spaced so a clear, CONSTANT annulus of solid stone
+  // (0.16 — one consistent string-course width, not a wandering gap) separates
+  // every ring from its neighbours, so the swept moldings read as distinct
+  // carved bars instead of a tangle. Every arched order's rApex is *derived*
+  // via archApex() above, not chosen by eye, so it is always a genuine
+  // two-centre Gothic point at whatever radius it sits (see archApex's doc
+  // comment for why a fixed rise doesn't survive to the outer, wider bays).
   //
   //   order        radial hole span      stone gap to next
   //   oculus       0.00 – 0.68
-  //   (gap 0.27)
-  //   bandA        0.95 – 1.60
-  //   (gap 0.23)   node1 ring 1.83 – 2.17
-  //   (gap 0.23)   bandC 2.40 – 3.05
-  //   (gap 0.24)   node2 ring 3.29 – 3.61
-  //   (gap 0.24)   bandD 3.85 – 4.52
-  //   (gap ~0.10)  archivolt rolls on the rim, inside plateRadius 4.9
+  //   (gap 0.16)
+  //   bandA        0.84 – 1.19
+  //   (gap 0.16)   node1 ring 1.35 – 1.80
+  //   (gap 0.16)   bandC 1.96 – 2.57
+  //   (gap 0.16)   node2 ring 2.73 – 3.23
+  //   (gap 0.16)   bandD 3.39 – 4.35
+  //   (gap 0.09)   archivolt rolls on the rim, inside plateRadius 4.9
   oculus: { foils: 8, centerDist: 0.4, foilRadius: 0.28 },
 
   // inner wreath of petal lights
-  bandA: { rIn: 0.95, rSpring: 1.3, rApex: 1.6, mullionWidth: 0.12, cusp: 0.05 },
-  // first node ring — quatrefoils on the spokes (extent ~0.17)
-  node1: { r: 2.0, foils: 4, centerDist: 0.07, foilRadius: 0.1, phase: Math.PI / 4 },
-  // middle order lights
-  bandC: { rIn: 2.4, rSpring: 2.8, rApex: 3.05, mullionWidth: 0.13, cusp: 0.06 },
-  // second node ring — sexfoils on the spokes (extent ~0.16)
-  node2: { r: 3.45, foils: 6, centerDist: 0.06, foilRadius: 0.1, phase: 0 },
+  bandA: {
+    rIn: 0.84,
+    rSpring: bandARSpring,
+    rApex: archApex(bandARSpring, HALF_BAY, RATIO_MAIN),
+    mullionWidth: 0.12,
+    cusp: 0.05,
+  },
+  // first node ring — quatrefoils on the spokes (extent ~0.225)
+  node1: { r: 1.574, foils: 4, centerDist: 0.095, foilRadius: 0.13, phase: Math.PI / 4 },
+  // middle order lights — taller than bandA (same H/h ratio, larger radius)
+  bandC: {
+    rIn: 1.959,
+    rSpring: bandCRSpring,
+    rApex: archApex(bandCRSpring, HALF_BAY, RATIO_MAIN),
+    mullionWidth: 0.13,
+    cusp: 0.06,
+  },
+  // second node ring — sexfoils on the spokes (extent ~0.25)
+  node2: { r: 2.984, foils: 6, centerDist: 0.105, foilRadius: 0.145, phase: 0 },
   // outer order: first-order arches subdivided into twin sub-lancets
   bandD: {
-    rIn: 3.85,
-    rSpring: 4.18,
-    rApex: 4.52,
+    rIn: 3.394,
+    rSpring: bandDRSpring,
+    rApex: archApex(bandDRSpring, HALF_BAY, RATIO_MAIN),
     mullionWidth: 0.15,
     subHalf: 0.05,
-    sub: { rIn: 3.9, rSpring: 4.06, rApex: 4.26, cusp: 0.04 },
-    quatrefoil: { r: 4.36, foils: 4, centerDist: 0.05, foilRadius: 0.07, phase: 0 },
+    sub: {
+      rIn: 3.444,
+      rSpring: bandDSubRSpring,
+      rApex: archApex(bandDSubRSpring, QUARTER_BAY, RATIO_SUB),
+      cusp: 0.04,
+    },
+    quatrefoil: { r: 4.199, foils: 4, centerDist: 0.05, foilRadius: 0.068, phase: 0 },
   },
   // molded archivolt rolls carried on the thick outer rim — spaced so the two
-  // rolls abut as a clean double order (~0.13 apart for their ~0.065 reach),
-  // clear of the outer lights (4.52) and inside the splay reveal (4.86)
-  archivolt: [4.6, 4.73],
+  // rolls abut as a clean double order, clear of the outer lights (4.352) and
+  // inside the splay reveal (4.86)
+  archivolt: [4.442, 4.602],
 }
 
 export interface Opening {

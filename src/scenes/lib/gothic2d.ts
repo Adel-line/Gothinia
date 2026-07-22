@@ -81,6 +81,15 @@ export function pointedHead(
   if (yhat.dot(mid) < 0) yhat.negate() // rise away from the scene origin
 
   const H = Math.max(apexHeight, h * 1.02) // pointed arches rise above the semicircle
+  if (import.meta.env?.DEV && apexHeight < h * 1.15) {
+    // apexHeight this close to h yields a near-semicircular "drop" arch, not
+    // a Gothic point — the caller's rSpring/rApex span doesn't match its
+    // width and needs retuning (see tracery.ts's archApex for the pattern).
+    console.warn(
+      `pointedHead: apexHeight ${apexHeight.toFixed(3)} is too small for half-span ${h.toFixed(3)} ` +
+        `(ratio ${(apexHeight / h).toFixed(2)}, want >~1.3) — arch will render nearly round, not pointed.`,
+    )
+  }
   const e = (H * H - h * h) / (2 * h)
   const Ra = h + e
   const ya = Math.sqrt(Ra * Ra - e * e)
