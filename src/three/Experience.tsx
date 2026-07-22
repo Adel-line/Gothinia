@@ -86,7 +86,7 @@ export function Experience() {
           arcade; normalBias keeps the granular stone free of shadow acne. */}
       <directionalLight
         position={[-9, 8, 7]}
-        intensity={0.95}
+        intensity={2.6}
         color="#f2c47b"
         castShadow
         shadow-mapSize={[2048, 2048]}
