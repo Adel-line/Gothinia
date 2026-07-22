@@ -35,7 +35,6 @@ export function smooth(x: number): number {
  * Within one scene's local t:
  *   zoom      0    → 0.45  camera pulls back from the tight opening pose
  *   overlay   0.35 → 0.55  text panel + callouts fade in (out again by 0.9)
- *   edge blur follows the overlay: frame edges soften while reading
  *   swap blur 0.85 → 1.0   full-frame blur ramps to max at the scene cut
  *   (and the next scene ramps it back down over its first 0.1)
  */
@@ -57,11 +56,6 @@ export function overlayOpacity(t: number): number {
   const [i0, i1] = PHASE.overlayIn
   const [o0, o1] = PHASE.overlayOut
   return ramp(t, i0, i1) * (1 - ramp(t, o0, o1))
-}
-
-/** Edge (vignette) blur strength — active while the overlay is readable. */
-export function edgeBlurStrength(t: number): number {
-  return overlayOpacity(t)
 }
 
 /**

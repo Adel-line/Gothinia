@@ -4,14 +4,13 @@ import { Bloom, EffectComposer, SSAO } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import { EdgeBlurEffect } from './effects/EdgeBlur'
 import { scenes } from '../scenes/registry'
-import { edgeBlurStrength, scenePhase, scrollState, swapBlurStrength } from '../scroll/scrollState'
+import { scenePhase, scrollState, swapBlurStrength } from '../scroll/scrollState'
 
 export function Effects() {
   const edgeBlur = useMemo(() => new EdgeBlurEffect(), [])
 
   useFrame(() => {
     const { index, t } = scenePhase(scrollState.progress, scenes.length)
-    edgeBlur.edgeStrength = edgeBlurStrength(t)
     // While the sequence has a single scene, let the final blur-out play as a
     // preview of the swap mechanic (isLast = false); with the full sequence
     // the last scene holds sharp instead.
