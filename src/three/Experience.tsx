@@ -74,10 +74,11 @@ export function Experience() {
       camera={{ fov: 36, near: 0.1, far: 120, position: [0, 0, 3.4] }}
     >
       {/* Cool ambient bounce only — the blue that VISION asks to sit *under*
-          the warm key. Kept very low so corners stay dark and the render
-          never flattens out; it exists to keep the deepest shadows from
-          crushing to pure black, tinted cold against the warm sun. */}
-      <hemisphereLight args={['#26314e', '#080605', 0.09]} />
+          the warm key. Kept low so corners stay dark and the render never
+          flattens out; it exists to keep the deepest shadows (incl. the
+          rose's wall reveal, which faces away from the key light) from
+          crushing to a flat black disc, tinted cold against the warm sun. */}
+      <hemisphereLight args={['#26314e', '#080605', 0.16]} />
 
       {/* Late-afternoon sun: the one shadow-casting key. Warm gold, raking in
           high and from the side so moldings, tracery, piers and capitals throw
