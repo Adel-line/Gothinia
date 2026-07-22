@@ -31,7 +31,9 @@ function deep(name: keyof typeof GLASS_COLORS): THREE.Color {
   const c = new THREE.Color(GLASS_COLORS[name])
   const hsl = { h: 0, s: 0, l: 0 }
   c.getHSL(hsl)
-  return new THREE.Color().setHSL(hsl.h, Math.min(1, hsl.s * 0.96), hsl.l * 0.82)
+  // Backlit pot-metal glass reads as saturated jewel tone, not a dim wash —
+  // keep it rich rather than desaturating/darkening toward the stone's tone.
+  return new THREE.Color().setHSL(hsl.h, Math.min(1, hsl.s * 1.12), Math.min(0.6, hsl.l * 1.05))
 }
 
 const COMMON = /* glsl */ `
@@ -133,7 +135,7 @@ export function makeRosePaneMaterial(art: GlassArtwork, frame: PaneFrame): THREE
     uBorderW: { value: art.borderWidth },
     uMotifScale: { value: art.motifScale },
     uSeed: { value: art.seed },
-    uIntensity: { value: 0.9 },
+    uIntensity: { value: 1.6 },
   }
 
   mat.onBeforeCompile = (shader) => {

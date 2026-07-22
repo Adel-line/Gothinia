@@ -77,7 +77,7 @@ export function Experience() {
           the warm key. Kept very low so corners stay dark and the render
           never flattens out; it exists to keep the deepest shadows from
           crushing to pure black, tinted cold against the warm sun. */}
-      <hemisphereLight args={['#26314e', '#080605', 0.09]} />
+      <hemisphereLight args={['#26314e', '#080605', 0.08]} />
 
       {/* Late-afternoon sun: the one shadow-casting key. Warm gold, raking in
           high and from the side so moldings, tracery, piers and capitals throw
@@ -86,7 +86,7 @@ export function Experience() {
           arcade; normalBias keeps the granular stone free of shadow acne. */}
       <directionalLight
         position={[-9, 8, 7]}
-        intensity={0.95}
+        intensity={1.1}
         color="#f2c47b"
         castShadow
         shadow-mapSize={[2048, 2048]}
