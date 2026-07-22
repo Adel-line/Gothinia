@@ -157,6 +157,82 @@ export function multifoilPoints(
 }
 
 /**
+ * Cusped spherical triangle (the "curvilinear triangle" that fills the
+ * spandrels of a rose between three tangent circles, and the corners between
+ * an outer wreath and its bounding ring). Given three corners, each side is
+ * drawn as a circular arc bulging INWARD toward the centroid, so the three
+ * sides meet at sharp points — a genuine spandrel opening, never a blank gap.
+ * `bulge` is the sagitta of each concave side as a fraction of that side's
+ * length; `cuspDepth` optionally nicks a foil-cusp into the middle of each
+ * side so the triangle reads as a cusped trefoil-triangle.
+ */
+export function sphericalTriangle(
+  corners: [THREE.Vector2, THREE.Vector2, THREE.Vector2],
+  bulge: number,
+  cuspDepth = 0,
+  segments = 12,
+): THREE.Vector2[] {
+  const centroid = corners[0].clone().add(corners[1]).add(corners[2]).multiplyScalar(1 / 3)
+  const pts: THREE.Vector2[] = []
+  for (let e = 0; e < 3; e++) {
+    const a = corners[e]
+    const b = corners[(e + 1) % 3]
+    const mid = a.clone().add(b).multiplyScalar(0.5)
+    const toC = centroid.clone().sub(mid)
+    const len = a.distanceTo(b)
+    if (toC.lengthSq() < 1e-9 || len < 1e-6) {
+      pts.push(a.clone())
+      continue
+    }
+    toC.normalize()
+    // apex of the concave arc, pulled toward the centroid
+    const apex = mid.clone().addScaledVector(toC, bulge * len)
+    // circle through a, apex, b — sample it as the side
+    const arc = arcThroughThree(a, apex, b, segments)
+    if (cuspDepth > 0) {
+      const i = Math.floor(arc.length / 2)
+      arc[i] = arc[i].clone().addScaledVector(toC, cuspDepth * len)
+    }
+    // drop the last point; the next side starts at b
+    for (let i = 0; i < arc.length - 1; i++) pts.push(arc[i])
+  }
+  return ensureWinding(pts, true)
+}
+
+/** Sample the circular arc that passes through p0 -> p1 -> p2 (in order). */
+function arcThroughThree(
+  p0: THREE.Vector2,
+  p1: THREE.Vector2,
+  p2: THREE.Vector2,
+  segments: number,
+): THREE.Vector2[] {
+  const ax = p0.x, ay = p0.y, bx = p1.x, by = p1.y, cx = p2.x, cy = p2.y
+  const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+  if (Math.abs(d) < 1e-9) return [p0.clone(), p1.clone(), p2.clone()] // collinear
+  const a2 = ax * ax + ay * ay
+  const b2 = bx * bx + by * by
+  const c2 = cx * cx + cy * cy
+  const ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
+  const uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
+  const center = new THREE.Vector2(ux, uy)
+  const r = center.distanceTo(p0)
+  const a0 = Math.atan2(ay - uy, ax - ux)
+  const aMid = Math.atan2(by - uy, bx - ux)
+  const aEnd = Math.atan2(cy - uy, cx - ux)
+  const norm = (x: number) => ((x % TAU) + TAU) % TAU
+  // sweep CCW from a0 unless p1 isn't reached before p2 that way, then CW
+  const midCcw = norm(aMid - a0)
+  const endCcw = norm(aEnd - a0)
+  const total = midCcw <= endCcw ? endCcw : endCcw - TAU
+  const out: THREE.Vector2[] = []
+  for (let i = 0; i <= segments; i++) {
+    const t = a0 + (total * i) / segments
+    out.push(new THREE.Vector2(ux + Math.cos(t) * r, uy + Math.sin(t) * r))
+  }
+  return out
+}
+
+/**
  * A pointed-arch opening in wall coordinates: flat sill, straight jambs,
  * two-centre head. Returns a closed CCW outline.
  */
