@@ -68,13 +68,13 @@ export function MilanArch() {
     buildArcadeGeometries,
     [],
   )
-  const limestone = useMemo(() => makeLimestone({ color: '#b9a88e' }), [])
+  const limestone = useMemo(() => makeLimestone({ color: '#acaca9' }), [])
   const moldingStone = useMemo(
-    () => makeLimestone({ color: '#8d7c64', roughness: 0.82, metalness: 0.0, bump: 0.09 }),
+    () => makeLimestone({ color: '#7c7c79', roughness: 0.82, metalness: 0.0, bump: 0.09 }),
     [],
   )
   const darkStone = useMemo(
-    () => makeLimestone({ color: '#5c5142', roughness: 0.97, bump: 0.03 }),
+    () => makeLimestone({ color: '#54534e', roughness: 0.97, bump: 0.03 }),
     [],
   )
   const glassMaterials = useMemo(

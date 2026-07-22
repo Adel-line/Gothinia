@@ -37,7 +37,7 @@ export function RoseWindow() {
   // carved moulding: slightly darker than the flat plate but just as matte —
   // structure comes from the raking light over the grain bump, not gloss
   const moldingStone = useMemo(
-    () => makeLimestone({ color: '#8d7c64', roughness: 0.82, metalness: 0.0, bump: 0.09 }),
+    () => makeLimestone({ color: '#7c7c79', roughness: 0.82, metalness: 0.0, bump: 0.09 }),
     [],
   )
   // Each pane is authored as a handcrafted GlassArtwork recipe and rendered by
