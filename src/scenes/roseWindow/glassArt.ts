@@ -86,15 +86,21 @@ function seedOf(o: Opening): number {
 
 /**
  * Ring families (from tracery.ts):
- *   0 octofoil oculus · 1 petals · 2 quatrefoil nodes · 3 middle lights ·
- *   4 sexfoil nodes · 5 outer twin sub-lancets · 6 head quatrefoils
+ *   0 twelve-foil oculus · 1 inner lancets · 2 quatrefoil nodes ·
+ *   3 middle sub-lancets · 4 sexfoil head-foils · 5 sexfoil nodes ·
+ *   6 outer fan lancets · 7 outer wreath circles · 8 spandrel triangles
+ *
+ * The iconographic program (after Sainte-Chapelle / French Rayonnant) reads
+ * as concentric zones: a gold sun at the heart, a royal heraldic wreath, a
+ * celestial foliate middle band with violet star-gems, then a luminous
+ * grisaille outer fan ringed by jewelled medallions and spandrel gems.
  */
 export function assignRoseArtwork(o: Opening): GlassArtwork {
   const even = o.index % 2 === 0
   const seed = seedOf(o)
 
   switch (o.ring) {
-    // ---- Central oculus: the radiant sun ----
+    // ---- ring 0 · central oculus: the radiant sun ----
     case 0:
       return {
         ground: 'cobalt',
@@ -111,7 +117,7 @@ export function assignRoseArtwork(o: Opening): GlassArtwork {
         seed,
       }
 
-    // ---- Inner wreath: the heraldry of the crown ----
+    // ---- ring 1 · inner lancets: the heraldry of the crown ----
     case 1:
       return even
         ? {
@@ -143,7 +149,7 @@ export function assignRoseArtwork(o: Opening): GlassArtwork {
             seed,
           }
 
-    // ---- Inner nodes: gold gems on blue ----
+    // ---- ring 2 · inner nodes: gold gems on blue ----
     case 2:
       return {
         ground: 'cobalt',
@@ -160,7 +166,7 @@ export function assignRoseArtwork(o: Opening): GlassArtwork {
         seed,
       }
 
-    // ---- Middle band: foliage on the celestial field (checker vs ring 1) ----
+    // ---- ring 3 · middle sub-lancets: foliage on the celestial field ----
     case 3:
       return {
         ground: even ? 'ruby' : 'cobalt',
@@ -177,7 +183,7 @@ export function assignRoseArtwork(o: Opening): GlassArtwork {
         seed,
       }
 
-    // ---- Middle nodes: the violet star-gems ----
+    // ---- ring 4 · middle head-foils: the violet star-gems ----
     case 4:
       return {
         ground: 'murrey',
@@ -194,8 +200,25 @@ export function assignRoseArtwork(o: Opening): GlassArtwork {
         seed,
       }
 
-    // ---- Outer band: the luminous grisaille frame ----
+    // ---- ring 5 · doubling-course nodes: rosette gems on blue ----
     case 5:
+      return {
+        ground: 'cobalt',
+        border: Border.Plain,
+        borderColor: 'gold',
+        borderWidth: 0.09,
+        field: Field.Plain,
+        fieldColor: 'cobalt',
+        motif: Motif.Rosette,
+        motifColor: 'gold',
+        motifAccent: 'white',
+        motifScale: 0.74,
+        lead: Lead.Auto,
+        seed,
+      }
+
+    // ---- ring 6 · outer fan: the luminous grisaille lancets ----
+    case 6:
       return {
         ground: 'grisaille',
         border: Border.Dentil,
@@ -211,19 +234,36 @@ export function assignRoseArtwork(o: Opening): GlassArtwork {
         seed,
       }
 
-    // ---- Head gems: cross terminals against the rim ----
-    case 6:
+    // ---- ring 7 · outer wreath: the jewelled medallion ring ----
+    case 7:
+      return {
+        ground: even ? 'ruby' : 'cobalt',
+        border: Border.Bead,
+        borderColor: 'gold',
+        borderWidth: 0.12,
+        field: Field.Plain,
+        fieldColor: even ? 'ruby' : 'cobalt',
+        motif: even ? Motif.Cross : Motif.Star6,
+        motifColor: 'gold',
+        motifAccent: 'white',
+        motifScale: 0.66,
+        lead: Lead.Auto,
+        seed,
+      }
+
+    // ---- ring 8 · spandrel triangles: small emerald trefoil gems ----
+    case 8:
     default:
       return {
-        ground: 'cobalt',
+        ground: 'emerald',
         border: Border.Plain,
         borderColor: 'gold',
-        borderWidth: 0.09,
+        borderWidth: 0.1,
         field: Field.Plain,
-        fieldColor: 'cobalt',
-        motif: Motif.Cross,
-        motifColor: 'ruby',
-        motifAccent: 'gold',
+        fieldColor: 'emerald',
+        motif: Motif.Trefoil,
+        motifColor: 'gold',
+        motifAccent: 'white',
         motifScale: 0.66,
         lead: Lead.Auto,
         seed,
