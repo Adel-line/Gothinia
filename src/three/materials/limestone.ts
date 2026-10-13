@@ -9,15 +9,19 @@ export interface LimestoneOptions {
 }
 
 /**
- * Aged French limestone (pierre de taille, after Paris/Amiens facing stone).
+ * Aged French limestone (pierre de taille, after Paris/Amiens facing stone),
+ * dressed to read as ASH GREY: the stone itself is neutral, and all warmth in
+ * the render comes from the light reflecting off it (the warm gold key), never
+ * from the material's own pigment.
  *
  * The whole surface is procedural — no texture files — but the point of this
  * pass is that it must NOT read as procedural. Three things break the "obvious
  * noise" look:
  *
- *   1. Domain-warped, multi-octave large-scale drift: broad blotches of warmer
- *      cream, cooler grey and faint ochre over ~2–4 metres, so no repeating
- *      cell is legible. Fine grain is subtle and rides on top.
+ *   1. Domain-warped, multi-octave large-scale drift: broad blotches of lighter
+ *      and cooler ash-grey stone over ~2–4 metres, so no repeating cell is
+ *      legible. The drift is tonal (light/dark), not coloured — the hue stays
+ *      neutral grey. Fine grain is subtle and rides on top.
  *   2. Irregular ashlar: courses of varying height, blocks of varying width,
  *      chipped/eroded joints (not ruler-straight), per-block tone, and edges
  *      that round and recess into the mortar via the bump field — so the wall
@@ -32,7 +36,7 @@ export interface LimestoneOptions {
 export function makeLimestone(opts: LimestoneOptions = {}): THREE.MeshStandardMaterial {
   const bump = opts.bump ?? 0.05
   const mat = new THREE.MeshStandardMaterial({
-    color: opts.color ?? '#b3a488',
+    color: opts.color ?? '#a7a7a4',
     roughness: opts.roughness ?? 0.93,
     metalness: opts.metalness ?? 0.0,
   })
@@ -112,14 +116,17 @@ export function makeLimestone(opts: LimestoneOptions = {}): THREE.MeshStandardMa
           float r = length(vLimePos.xy);
 
           // ---- large-scale mineral drift (domain-warped, multi-octave) ----
+          // Neutral, ash-grey drift: the blotches vary in *tone* (light/dark)
+          // and only a hair in temperature, never in pigment. Any warmth on the
+          // stone is the gold key reflecting off it, not the stone's own colour.
           vec3 mp = limeWarp(vLimePos * 0.22, 1.4);
           float m1 = limeFbm(mp);
           float m2 = limeFbm(mp * 0.5 + 7.0);
-          vec3 cream = vec3(1.07, 1.01, 0.86);
-          vec3 grey  = vec3(0.92, 0.94, 0.96);
-          vec3 ochre = vec3(1.09, 0.97, 0.79);
-          vec3 tint = mix(grey, cream, smoothstep(0.30, 0.62, m1));
-          tint = mix(tint, ochre, smoothstep(0.60, 0.88, m2) * 0.6);
+          vec3 pale = vec3(1.03, 1.03, 1.03); // lighter ash
+          vec3 cool = vec3(0.94, 0.95, 0.97); // cooler, faintly blue-grey
+          vec3 warm = vec3(1.02, 1.01, 0.99); // barely-there mineral warmth
+          vec3 tint = mix(cool, pale, smoothstep(0.30, 0.62, m1));
+          tint = mix(tint, warm, smoothstep(0.60, 0.88, m2) * 0.6);
           diffuseColor.rgb *= tint * mix(0.86, 1.10, m1 * 0.6 + m2 * 0.4);
 
           // ---- fine grain, subtle, riding on top ----
