@@ -185,6 +185,12 @@ export function makeLimestone(opts: LimestoneOptions = {}): THREE.MeshStandardMa
                      + (1.0 - smoothstep(0.0, 0.03, edge)) * 0.06;
           soot *= 0.6 + 0.8 * limeFbm(vLimePos * vec3(1.5, 0.4, 1.5));
           diffuseColor.rgb *= 1.0 - soot;
+        #if LIME_MASONRY == 1
+          // the transept wall is lit by the window it frames: light pools
+          // round the rose and its claire-voie, the far wall falls into shade
+          float far = length((vLimePos.xy - vec2(0.0, -2.5)) / vec2(11.0, 10.0));
+          diffuseColor.rgb *= mix(0.35, 1.0, exp(-far * far * 1.3));
+        #endif
         }`,
       )
       .replace(

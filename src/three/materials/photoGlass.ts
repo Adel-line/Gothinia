@@ -1,21 +1,21 @@
 import * as THREE from 'three'
 
 /**
- * Rose-window glass from a photograph of the real window.
+ * Stained glass from a photograph of the real window.
  *
- * tools/trace_rose.py unwraps the photographed rose, fills in what the photo
- * crops or hides from the matching place one sector over, and tones it for
- * use as a light source. The glass is ONE disc behind the traced stone plate,
- * so every opening shows the glass that really fills it — medallions, figures
- * and leading in their true places.
+ * tools/trace_rose.py turns the photographed rose and claire-voie into glass
+ * images (gaps filled, toned for use as a light source, a lead came run round
+ * every opening). Each is ONE sheet behind its traced stone plate, so every
+ * opening shows the glass that really fills it — medallions, figures and
+ * leading in their true places.
  *
  * Lighting model: the glass is a light source seen in transmission, so the
  * colour goes out through emissive while the diffuse term stays near black.
  */
-export function makeRoseGlassMaterial(): THREE.MeshStandardMaterial {
-  const map = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/rose-glass.jpg`)
+export function makePhotoGlassMaterial(file: string): THREE.MeshStandardMaterial {
+  const map = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/${file}`)
   map.colorSpace = THREE.SRGBColorSpace
-  map.anisotropy = 8
+  map.anisotropy = 16
 
   const mat = new THREE.MeshStandardMaterial({
     color: new THREE.Color('#050506'),

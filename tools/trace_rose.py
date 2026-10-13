@@ -22,8 +22,13 @@ Pipeline
 
     python3 tools/trace_rose.py
     -> src/scenes/roseWindow/roseTracery.json   openings + callout anchors
-    -> public/textures/rose-glass.jpg           full rose, glass only
-    -> public/textures/rose-stone-normal.jpg    moulding relief, plate face
+    -> public/textures/rose-glass.webp          full rose, glass only
+    -> public/textures/rose-stone-normal.webp   moulding relief, plate face
+
+It also traces the claire-voie — the row of paired lancets with standing
+figures under the rose, in the same photo — as a straight strip:
+    -> src/scenes/roseWindow/claireVoie.json
+    -> public/textures/claire-glass.webp
 
 Needs: numpy, scipy, opencv-python-headless.
 """
@@ -40,8 +45,10 @@ from scipy import ndimage
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / 'References' / 'IMG_6251.jpg'
 OUT_JSON = ROOT / 'src' / 'scenes' / 'roseWindow' / 'roseTracery.json'
-OUT_GLASS = ROOT / 'public' / 'textures' / 'rose-glass.jpg'
-OUT_NORMAL = ROOT / 'public' / 'textures' / 'rose-stone-normal.jpg'
+OUT_GLASS = ROOT / 'public' / 'textures' / 'rose-glass.webp'
+OUT_NORMAL = ROOT / 'public' / 'textures' / 'rose-stone-normal.webp'
+OUT_CLAIRE_JSON = ROOT / 'src' / 'scenes' / 'roseWindow' / 'claireVoie.json'
+OUT_CLAIRE_GLASS = ROOT / 'public' / 'textures' / 'claire-glass.webp'
 
 # Rose in the photo (pixels), fitted by maximising its 12-fold symmetry; the
 # radius is where the outermost glass ends.
@@ -50,6 +57,8 @@ RX = 1165.0
 RY = RX * 853.0 / 1026.0
 RAIL_Y = 2405.0  # gallery railing crosses the lower rose below this
 SECTORS = 12
+# beyond this (normalised) radius the glass comes from the canonical sector
+OUTER_RING = 0.70
 
 # Normalised units: 1.0 = outer edge of the glazing. The stone plate runs a
 # little further, to the rim mouldings.
@@ -112,6 +121,110 @@ def smooth_contour(c: np.ndarray, sigma: float = 4.0) -> np.ndarray:
     return cv2.approxPolyDP(xy.astype(np.float32)[:, None, :], 0.7, True)[:, 0, :].astype(np.float64)
 
 
+def relief_normal(glass: np.ndarray, bar_half_px: float) -> np.ndarray:
+    """Moulding relief from distance-to-glass: the same quarter-round roll
+    and fillet at every opening edge, never wider than half a bar."""
+    d = ndimage.distance_transform_edt((1 - glass).astype(np.uint8))
+    W = max(bar_half_px * 0.9, 3.0)
+    t = np.clip(d / W, 0, 1)
+    hgt = np.sqrt(1 - (1 - t) ** 2)
+    hgt -= 0.18 * np.exp(-(((d - W * 1.35) / (0.35 * W)) ** 2))
+    hgt = cv2.GaussianBlur(hgt.astype(np.float32), (0, 0), 0.8)
+    gy, gx = np.gradient(hgt * W)
+    nx, ny, nz = -gx, gy, np.ones_like(gx)  # image rows run down, +y is up
+    norm = np.sqrt(nx * nx + ny * ny + nz * nz)
+    nmap = np.stack([nx / norm, ny / norm, nz / norm], -1)
+    nmap[glass > 0] = (0, 0, 1)
+    return ((nmap * 0.5 + 0.5) * 255).astype(np.uint8)[..., ::-1]  # RGB -> BGR
+
+
+def tone_glass(bgr: np.ndarray, row_axis: bool) -> np.ndarray:
+    """Tone a photo of glass for use as a light source: lift the mid-tones on
+    value (keeps hue), keep lead dark, even out exposure (per row when the
+    rows are radii of the rose), roll off glints."""
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV).astype(np.float32)
+    Vv = hsv[..., 2] / 255
+    if row_axis:
+        med = np.array([np.percentile(r[r > 0.05], 60) if (r > 0.05).any() else 0.3 for r in Vv])
+        med = ndimage.uniform_filter1d(med, 31)[:, None]
+    else:
+        med = np.percentile(Vv[Vv > 0.05], 60)
+    gain = np.clip(0.3 / np.maximum(med, 1e-3), 0.8, 2.0)
+    x = np.clip((Vv * gain - 0.05) / 0.95, 0, None)
+    y = x ** 0.75
+    y = y / (y + 0.3) * 1.3
+    hsv[..., 2] = np.clip(y, 0, 1) * 255
+    return cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+
+
+def finish_glass(gimg: np.ndarray, glass: np.ndarray | None) -> np.ndarray:
+    """Crisp it up for close views, and run a dark lead came round the edge
+    of every opening — real glass is leaded into the stone, and the line
+    hides any sliver where photo and traced stone disagree."""
+    blur = cv2.GaussianBlur(gimg, (0, 0), 1.6)
+    sharp = cv2.addWeighted(gimg, 1.6, blur, -0.6, 0)
+    if glass is None:
+        return sharp
+    dg = ndimage.distance_transform_edt(glass)
+    came = np.clip((dg - 1.5) / 3.0, 0, 1)[..., None]
+    return (sharp.astype(np.float32) * (0.12 + 0.88 * came)).astype(np.uint8)
+
+
+def clean_openings(glass: np.ndarray, disk_px: int, min_area: int, close_px: int | None = None) -> np.ndarray:
+    """Open (drop teeth and specks) then close (fill notches) — a smaller
+    close keeps thin mullions from being bridged — fill holes, drop
+    dot-sized openings."""
+    disk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (disk_px, disk_px))
+    cdisk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close_px or disk_px,) * 2)
+    glass = cv2.morphologyEx(glass, cv2.MORPH_OPEN, disk)
+    glass = cv2.morphologyEx(glass, cv2.MORPH_CLOSE, cdisk)
+    glass = ndimage.binary_fill_holes(glass).astype(np.uint8)
+    lab, n = ndimage.label(glass)
+    sizes = ndimage.sum(glass, lab, range(1, n + 1))
+    return np.isin(lab, np.nonzero(sizes >= min_area)[0] + 1).astype(np.uint8)
+
+
+# ---- claire-voie ------------------------------------------------------------
+# The row of paired lancets under the rose. Major mullions (between pairs)
+# found in the photo every ~364 px; six whole bays lie between columns 44 and
+# 2227. One bay is mirrored onto each end (seamless: a mullion is symmetric)
+# to fill the arch's width. Rows: tracery top 2760 to sill 3830.
+CV_X0, CV_X1, CV_BAY = 44, 2227, 364
+CV_Y0, CV_Y1 = 2760, 3830
+CV_TEX_W = 4096
+
+
+def trace_claire_voie(img: np.ndarray) -> None:
+    strip = img[CV_Y0:CV_Y1, CV_X0:CV_X1]
+    strip = np.concatenate([strip[:, :CV_BAY][:, ::-1], strip, strip[:, -CV_BAY:][:, ::-1]], axis=1)
+    bays = strip.shape[1] / CV_BAY
+    sx = 4.5 / RX                 # world units per photo px, across
+    sy = sx * RX / RY             # and down (the photo is foreshortened)
+    width = strip.shape[1] * sx
+    height = strip.shape[0] * sy
+    ppu = CV_TEX_W / width        # texture px per world unit
+    th = int(round(height * ppu))
+    strip = cv2.resize(strip, (CV_TEX_W, th), interpolation=cv2.INTER_CUBIC)
+
+    # The lancets themselves are regular, so frame.ts builds them from the
+    # bay rhythm measured here; this only produces their glass. (Tracing them
+    # fails: the backlit mullions are as dark as lead.) Gaps — mullions,
+    # gables — are filled from the nearest glass.
+    hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV).astype(np.float32) / 255
+    gsrc = (hsv[..., 1] > 0.38) & (hsv[..., 2] > 0.08)
+    _, (iy, ix) = ndimage.distance_transform_edt(~gsrc, return_indices=True)
+    gimg = finish_glass(tone_glass(strip[iy, ix], row_axis=False), None)
+
+    cv2.imwrite(str(OUT_CLAIRE_GLASS), gimg, [cv2.IMWRITE_WEBP_QUALITY, 92])
+    OUT_CLAIRE_JSON.write_text(json.dumps({
+        'source': 'References/IMG_6251.jpg (Notre-Dame de Paris, south transept claire-voie)',
+        'width': round(width, 4),
+        'height': round(height, 4),
+        'bays': round(bays, 2),
+    }) + '\n')
+    print(f'claire-voie: {bays:.0f} bays, {width:.2f} x {height:.2f} world units')
+
+
 def mirror_axis(sector_mean: np.ndarray) -> int:
     """Column (0..P-1) of the mirror axis within a sector."""
     best, best_a = -1e9, 0
@@ -133,7 +246,6 @@ def main() -> None:
     mask = glass_mask(img)
     mx, my, valid = polar_maps(h, w)
     Mp = cv2.remap(mask, mx, my, cv2.INTER_LINEAR)
-    Cp = cv2.remap(img, mx, my, cv2.INTER_CUBIC)
     V = valid.astype(np.float32)
 
     # ---- canonical sector ---------------------------------------------------
@@ -160,17 +272,10 @@ def main() -> None:
     full = cv2.remap(canon_wrap, ccol, row, cv2.INTER_LINEAR)
     full[rad > 1.0] = 0
     glass = (full > 0.5).astype(np.uint8)
-    # knock off teeth and fill notches the photo's lighting left on edges;
-    # dressed stone has clean curves
-    disk = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (13, 13))
-    glass = cv2.morphologyEx(glass, cv2.MORPH_OPEN, disk)
-    glass = cv2.morphologyEx(glass, cv2.MORPH_CLOSE, disk)
-    # stone specks inside a light (lead lines, glints) are not tracery, and
-    # dot-sized "openings" are noise
-    glass = ndimage.binary_fill_holes(glass).astype(np.uint8)
-    lab, n = ndimage.label(glass)
-    sizes = ndimage.sum(glass, lab, range(1, n + 1))
-    glass = np.isin(lab, np.nonzero(sizes >= 2500)[0] + 1).astype(np.uint8)
+    # knock off teeth and fill notches the photo's lighting left on edges
+    # (dressed stone has clean curves); fill stone specks inside a light
+    # (lead lines, glints); drop dot-sized "openings"
+    glass = clean_openings(glass, 13, 2500)
     if DEBUG:
         cv2.imwrite(str(ROOT / 'tools' / 'debug-rose-mask.png'), glass * 255)
 
@@ -201,27 +306,15 @@ def main() -> None:
     bar_half_px = float(np.percentile(dist[ridge], 5))
 
     # ---- stone relief -------------------------------------------------------
-    stone_all = (1 - glass).astype(np.uint8)
-    d = ndimage.distance_transform_edt(stone_all)
-    W = max(bar_half_px * 0.9, 3.0)  # roll radius never exceeds half a bar
-    t = np.clip(d / W, 0, 1)
-    hgt = np.sqrt(1 - (1 - t) ** 2)  # quarter-round roll at every glass edge
-    hgt -= 0.18 * np.exp(-(((d - W * 1.35) / (0.35 * W)) ** 2))  # fillet beside it
-    hgt = cv2.GaussianBlur(hgt.astype(np.float32), (0, 0), 0.8)
-    gy, gx = np.gradient(hgt * W)  # height in pixel units -> slopes
-    nx, ny, nz = -gx, gy, np.ones_like(gx)  # image rows run down, +y is up
-    norm = np.sqrt(nx * nx + ny * ny + nz * nz)
-    nmap = np.stack([nx / norm, ny / norm, nz / norm], -1)
-    nmap[glass > 0] = (0, 0, 1)
-    nimg = ((nmap * 0.5 + 0.5) * 255).astype(np.uint8)[..., ::-1]  # RGB -> BGR
+    nimg = relief_normal(glass, bar_half_px)
 
     # ---- glass image --------------------------------------------------------
     # nearest real glass for any photographed stone or lead outside the
     # clean openings, so no grey sliver shows at an opening's edge
-    gsrc = Mp > 0.5
-    _, (iy, ix) = ndimage.distance_transform_edt(~gsrc, return_indices=True)
-    Cf = Cp[iy, ix]
-    Gf = gsrc[iy, ix] & valid[iy, ix]
+    # (done on the flat photo: in polar space the fill would smear radially
+    # near the centre, where a few pixels span a wide angle)
+    _, (iy, ix) = ndimage.distance_transform_edt(mask < 0.5, return_indices=True)
+    Cf = cv2.remap(img[iy, ix], mx, my, cv2.INTER_CUBIC)
     # where this spot is out of frame / behind the railing, borrow the same
     # spot from the nearest sector that is visible
     out = np.zeros_like(Cf)
@@ -231,25 +324,22 @@ def main() -> None:
         ok = np.roll(valid, -sh, 1) & ~have
         out[ok] = np.roll(Cf, -sh, 1)[ok]
         have |= ok
-    Cg = out
+    # The outer ring's small foiled lights are where perspective misaligns
+    # one sector against the next most; there, use the canonical (top)
+    # sector's own glass, repeated, so glass and traced stone coincide.
+    # The inner rings keep each sector's own figures.
+    top_cols = (start + top * P + np.arange(P)) % NT
+    canon_glass = np.tile(Cf[:, top_cols], (1, SECTORS, 1))
+    canon_glass = np.roll(canon_glass, start, axis=1)
+    rn = ((np.arange(NR) + 0.5) / NR * PLATE_R)[:, None, None]
+    Cg = np.where(rn > OUTER_RING, canon_glass, out)
 
-    # tone it as a light source: lift the mid-tones on value (keeps hue), keep
-    # lead dark, even out the rim the phone metered darker, roll off glints
-    hsv = cv2.cvtColor(Cg, cv2.COLOR_BGR2HSV).astype(np.float32)
-    Vv = hsv[..., 2] / 255
-    rows_med = np.array([np.percentile(Vv[i][Vv[i] > 0.05], 60) if (Vv[i] > 0.05).any() else 0.3
-                         for i in range(NR)])
-    rows_med = ndimage.uniform_filter1d(rows_med, 31)
-    gain = np.clip(0.3 / np.maximum(rows_med, 1e-3), 0.8, 2.0)[:, None]
-    x = np.clip((Vv * gain - 0.05) / 0.95, 0, None)
-    y = x ** 0.75
-    y = y / (y + 0.3) * 1.3
-    hsv[..., 2] = np.clip(y, 0, 1) * 255
-    Cg = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+    Cg = tone_glass(Cg, row_axis=True)
 
     Cg_wrap = np.concatenate([Cg, Cg[:, :1]], axis=1)
     gimg = cv2.remap(Cg_wrap, col, row, cv2.INTER_LINEAR)
     gimg[rad > 1.02] = 0
+    gimg = finish_glass(gimg, glass)
 
     # ---- callout anchors (normalised units) ---------------------------------
     def pick(r_lo, r_hi, theta):
@@ -270,8 +360,8 @@ def main() -> None:
     }
 
     OUT_GLASS.parent.mkdir(parents=True, exist_ok=True)
-    cv2.imwrite(str(OUT_GLASS), gimg, [cv2.IMWRITE_JPEG_QUALITY, 84])
-    cv2.imwrite(str(OUT_NORMAL), nimg, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    cv2.imwrite(str(OUT_GLASS), gimg, [cv2.IMWRITE_WEBP_QUALITY, 92])
+    cv2.imwrite(str(OUT_NORMAL), nimg, [cv2.IMWRITE_WEBP_QUALITY, 95])
     OUT_JSON.write_text(json.dumps({
         'source': 'References/IMG_6251.jpg (Notre-Dame de Paris, south rose)',
         'sectors': SECTORS,
@@ -280,8 +370,10 @@ def main() -> None:
         'anchors': {k: [round(v[0], 4), round(v[1], 4)] for k, v in anchors.items()},
         'openings': openings,
     }) + '\n')
-    print(f'{len(openings)} openings, mirror axis col {axis}, '
+    print(f'rose: {len(openings)} openings, mirror axis col {axis}, '
           f'min half-bar {bar_half_px * px:.4f}, json {OUT_JSON.stat().st_size // 1024} KB')
+
+    trace_claire_voie(img)
 
 
 if __name__ == '__main__':

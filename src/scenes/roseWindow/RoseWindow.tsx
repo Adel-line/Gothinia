@@ -1,17 +1,22 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { buildRoseGeometries, ROSE } from './tracery'
+import { buildFrameGeometries } from './frame'
 import { makeLimestone } from '../../three/materials/limestone'
-import { makeRoseGlassMaterial } from '../../three/materials/photoGlass'
+import { makePhotoGlassMaterial } from '../../three/materials/photoGlass'
 
-/** The traced moulding relief (normal map), laid over the plate's front face. */
-function plateRelief(): THREE.Texture {
-  const tex = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/rose-stone-normal.jpg`)
-  // plate UVs are world XY; the map covers [-R, R] in both
+function loadRelief(file: string): THREE.Texture {
+  const tex = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/${file}`)
+  tex.anisotropy = 16
+  return tex
+}
+
+/** The rose's traced moulding relief, laid over its plate face (UVs = world XY). */
+function roseRelief(): THREE.Texture {
+  const tex = loadRelief('rose-stone-normal.webp')
   const s = 1 / (2 * ROSE.textureRadius)
   tex.repeat.set(s, s)
   tex.offset.set(0.5, 0.5)
-  tex.anisotropy = 8
   return tex
 }
 
@@ -31,12 +36,12 @@ function revealBounce(): THREE.DataTexture {
 }
 
 export function RoseWindow() {
-  const { stoneGeometry, moldingGeometry, splayGeometry, wallGeometry } = useMemo(
-    buildRoseGeometries,
-    [],
-  )
-  const limestone = useMemo(() => makeLimestone({ masonry: 'rose' }), [])
-  const limestoneDS = useMemo(() => {
+  const { stoneGeometry, moldingGeometry, splayGeometry } = useMemo(buildRoseGeometries, [])
+  const frame = useMemo(buildFrameGeometries, [])
+
+  // walls: ashlar, with voussoirs round the rose
+  const wallStone = useMemo(() => makeLimestone({ masonry: 'rose' }), [])
+  const splayStone = useMemo(() => {
     const m = makeLimestone({ masonry: 'rose' })
     m.side = THREE.DoubleSide // splay cone is seen from inside
     // The reveal faces away from the sun; in a real interior it still catches
@@ -47,26 +52,41 @@ export function RoseWindow() {
     m.lightMapIntensity = 1
     return m
   }, [])
-  // plate faces carry the moulding relief; the hole walls are plain dressed stone
-  const plateMaterials = useMemo(() => {
+  // traced plates: faces carry the moulding relief, hole walls are plain stone
+  const rosePlate = useMemo(() => {
     const face = makeLimestone()
-    face.normalMap = plateRelief()
+    face.normalMap = roseRelief()
     return [face, makeLimestone()]
   }, [])
-  // carved rim rolls: the same stone, a shade darker with a little more wear
-  const moldingStone = useMemo(() => makeLimestone({ color: '#a9a69e', roughness: 0.85 }), [])
-  const glass = useMemo(makeRoseGlassMaterial, [])
+  const clairePlate = useMemo(() => makeLimestone(), [])
+  // carved members (rolls, capitals, string course): the same stone, a shade
+  // darker with a little more wear
+  const carved = useMemo(() => makeLimestone({ color: '#a9a69e', roughness: 0.85 }), [])
+  const roseGlass = useMemo(() => makePhotoGlassMaterial('rose-glass.webp'), [])
+  const claireGlass = useMemo(() => makePhotoGlassMaterial('claire-glass.webp'), [])
 
   return (
     <group>
-      <mesh geometry={wallGeometry} material={limestone} />
-      <mesh geometry={stoneGeometry} material={plateMaterials} />
-      <mesh geometry={moldingGeometry} material={moldingStone} />
-      <mesh geometry={splayGeometry} material={limestoneDS} />
+      {/* the frame: wall, moulded arch orders with capitals, string course */}
+      <mesh geometry={frame.outerWall} material={wallStone} />
+      <mesh geometry={frame.windowWall} material={wallStone} />
+      <mesh geometry={frame.orders} material={carved} />
+      <mesh geometry={frame.capitals} material={carved} />
+      <mesh geometry={frame.stringCourse} material={carved} />
+
+      {/* the rose */}
+      <mesh geometry={stoneGeometry} material={rosePlate} />
+      <mesh geometry={moldingGeometry} material={carved} />
+      <mesh geometry={splayGeometry} material={splayStone} />
       {/* one disc of glass behind the whole plate, like a real glazed rose */}
-      <mesh position={[0, 0, ROSE.glassZ]} material={glass}>
+      <mesh position={[0, 0, ROSE.glassZ]} material={roseGlass}>
         <circleGeometry args={[ROSE.textureRadius, 128]} />
       </mesh>
+
+      {/* the claire-voie under it */}
+      <mesh geometry={frame.clairePlate} material={clairePlate} />
+      <mesh geometry={frame.claireGlass} material={claireGlass} />
+
       {/* daylight through the glass, scattered back onto the tracery's inner
           face: neutral, faintly blue from the cobalt — never orange */}
       <pointLight position={[0, 0, 1.4]} intensity={0.55} color="#c4c3d2" distance={7} decay={2} />

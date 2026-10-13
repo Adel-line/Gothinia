@@ -56,7 +56,6 @@ export function buildRoseGeometries(): {
   stoneGeometry: THREE.ExtrudeGeometry
   moldingGeometry: THREE.BufferGeometry
   splayGeometry: THREE.BufferGeometry
-  wallGeometry: THREE.ExtrudeGeometry
   openings: Opening[]
 } {
   const openings = buildOpenings()
@@ -93,20 +92,7 @@ export function buildRoseGeometries(): {
   const splayGeometry = new THREE.LatheGeometry(splayProfile, 96)
   splayGeometry.rotateX(Math.PI / 2)
 
-  // Surrounding wall with a circular reveal the splay sits inside.
-  const wall = new THREE.Shape()
-  wall.moveTo(-16, -13)
-  wall.lineTo(16, -13)
-  wall.lineTo(16, 13)
-  wall.lineTo(-16, 13)
-  wall.closePath()
-  wall.holes.push(
-    new THREE.Path(ensureWinding(arcPoints(0, 0, ROSE.wallHoleRadius, 0, TAU, 96).slice(0, -1), false)),
-  )
-  const wallGeometry = new THREE.ExtrudeGeometry(wall, { depth: 1.2, bevelEnabled: false })
-  wallGeometry.translate(0, 0, -0.75) // wall front face at z = 0.45
-
-  return { stoneGeometry, moldingGeometry, splayGeometry, wallGeometry, openings }
+  return { stoneGeometry, moldingGeometry, splayGeometry, openings }
 }
 
 // Callout anchors, picked by the tracing tool from the real openings.

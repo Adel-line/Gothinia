@@ -35,7 +35,7 @@ function ActiveScene() {
   return (
     <>
       <color attach="background" args={[def.background]} />
-      <fogExp2 attach="fog" args={[def.background, 0.045]} />
+      <fogExp2 attach="fog" args={[def.background, 0.02]} />
       {scenes.map((scene, index) => (
         <group
           key={scene.content.id}
