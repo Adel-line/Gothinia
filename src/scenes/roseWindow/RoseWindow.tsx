@@ -2,8 +2,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { buildRoseGeometries, ROSE, type Opening } from './tracery'
 import { makeLimestone } from '../../three/materials/limestone'
-import { assignRoseArtwork } from './glassArt'
-import { makeRosePaneMaterial, type PaneFrame } from '../../three/materials/glassArtwork'
+import { glassTiles, makePhotoGlassMaterial, type PaneFrame } from '../../three/materials/photoGlass'
 
 function glassGeometry(opening: Opening): THREE.ShapeGeometry {
   // expand slightly about the opening centre so pane edges hide inside stone
@@ -23,6 +22,39 @@ function paneFrame(o: Opening): PaneFrame {
   return { center: [o.center.x, o.center.y], angle, radius }
 }
 
+/** Radial length over tangential width — the same measure the atlas tool uses. */
+function elongation(o: Opening): number {
+  const r = o.center.length()
+  if (r < 1e-3) return 1
+  const ru = o.center.clone().divideScalar(r)
+  let a0 = Infinity, a1 = -Infinity, t0 = Infinity, t1 = -Infinity
+  for (const p of o.points) {
+    const d = p.clone().sub(o.center)
+    const along = d.dot(ru)
+    const across = d.x * -ru.y + d.y * ru.x
+    a0 = Math.min(a0, along); a1 = Math.max(a1, along)
+    t0 = Math.min(t0, across); t1 = Math.max(t1, across)
+  }
+  return (a1 - a0) / Math.max(t1 - t0, 1e-3)
+}
+
+/**
+ * Picks the photographed opening that best fits this pane: one from the same
+ * part of the real rose (radial position) with the same proportions, varied
+ * deterministically among the closest few so neighbouring panes don't repeat.
+ */
+function pickTile(o: Opening, rimRadius: number): number {
+  const rn = Math.min(o.center.length() / rimRadius, 1)
+  const el = elongation(o)
+  const ranked = glassTiles
+    .map((t) => ({ t, score: Math.abs(rn - t.rn) * 3 + Math.abs(Math.log(el / t.elong)) }))
+    .sort((a, b) => a.score - b.score)
+  const pool = ranked.slice(0, Math.min(5, ranked.length))
+  let h = Math.imul(o.ring + 1, 73856093) ^ Math.imul(o.index + 1, 19349663)
+  h = Math.imul(h ^ (h >>> 13), 1274126177)
+  return pool[(h >>> 0) % pool.length].t.tile
+}
+
 export function RoseWindow() {
   const { stoneGeometry, moldingGeometry, splayGeometry, wallGeometry, openings } = useMemo(
     buildRoseGeometries,
@@ -40,17 +72,17 @@ export function RoseWindow() {
     () => makeLimestone({ color: '#7c7c79', roughness: 0.82, metalness: 0.0, bump: 0.09 }),
     [],
   )
-  // Each pane is authored as a handcrafted GlassArtwork recipe and rendered by
-  // its own compositor material (all sharing one compiled program).
-  const panes = useMemo(
-    () =>
-      openings.map((o) => ({
-        geometry: glassGeometry(o),
-        material: makeRosePaneMaterial(assignRoseArtwork(o), paneFrame(o)),
-        key: `${o.ring}-${o.index}`,
-      })),
-    [openings],
-  )
+  // Each pane carries a photographed opening of a real 13th-c. rose, matched
+  // to its position and shape (all sharing one compiled program).
+  const panes = useMemo(() => {
+    let rim = 1e-3
+    for (const o of openings) for (const p of o.points) rim = Math.max(rim, p.length())
+    return openings.map((o) => ({
+      geometry: glassGeometry(o),
+      material: makePhotoGlassMaterial(pickTile(o, rim), paneFrame(o)),
+      key: `${o.ring}-${o.index}`,
+    }))
+  }, [openings])
 
   return (
     <group>

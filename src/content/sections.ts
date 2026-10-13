@@ -15,15 +15,16 @@ export interface SectionContent {
 export const sections: SectionContent[] = [
   {
     id: 'rose-window',
-    kicker: 'Sainte-Chapelle · Paris · Rayonnant',
+    kicker: 'Notre-Dame de Paris · North rose · c. 1250',
     title: 'The Rose Window',
     body:
-      'In the Rayonnant style, stone was pared down to a skeletal framework of ' +
-      'mullions radiating from a central oculus — the wall itself became glass. ' +
-      'The western rose of Sainte-Chapelle, rebuilt around 1485, turns fifteen ' +
-      'metres of masonry into a wheel of light: slender spokes brace rings of ' +
-      'cusped lights, and each opening is glazed in deep cobalt and ruby so the ' +
-      'chapel interior reads as a reliquary lit from within.',
+      'Around 1250 the masons of Notre-Dame stopped treating the wall as ' +
+      'something to pierce and began treating it as a frame for light. The ' +
+      'north rose is nearly thirteen metres across, yet its stone is pared ' +
+      'down to a net of slender bars — spokes that multiply as they run ' +
+      'outward, ring after ring of lights held between them. Most of the ' +
+      'glass is still the glass they set: deep cobalt and ruby, kings and ' +
+      'prophets gathered around the Virgin at the centre.',
     calloutLabels: [
       'Central oculus',
       'Radiating mullions',

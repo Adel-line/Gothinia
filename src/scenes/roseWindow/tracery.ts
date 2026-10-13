@@ -14,7 +14,7 @@ import {
 /**
  * Procedural Rayonnant rose window, after the south-transept rose of
  * Notre-Dame de Paris / Saint-Denis (with subdivided lights after Strasbourg,
- * and the glazing of Sainte-Chapelle). The governing idea is a real 13th-c.
+ * glazed from photographs of Notre-Dame's north rose). The governing idea is a real 13th-c.
  * rose's geometry: a dense radial fan of pointed cusped lancets that DOUBLES
  * its spoke count at a string-course, pinned at every ring by foiled circles,
  * with every gap filled — a skeletal even net of stone, glass subordinate.
