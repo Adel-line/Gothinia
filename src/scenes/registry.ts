@@ -19,9 +19,9 @@ export const scenes: SceneDef[] = [
     background: '#060403',
     callouts: [
       { label: sections[0].calloutLabels[0], anchor: roseAnchors.oculus, labelOffset: [0.17, 0.2] },
-      { label: sections[0].calloutLabels[1], anchor: roseAnchors.mullion, labelOffset: [0.13, -0.14] },
+      { label: sections[0].calloutLabels[1], anchor: roseAnchors.mullion, labelOffset: [-0.13, -0.16] },
       { label: sections[0].calloutLabels[2], anchor: roseAnchors.trefoil, labelOffset: [-0.1, 0.16] },
-      { label: sections[0].calloutLabels[3], anchor: roseAnchors.pane, labelOffset: [0.12, -0.08] },
+      { label: sections[0].calloutLabels[3], anchor: roseAnchors.pane, labelOffset: [0.17, -0.05] },
     ],
   },
   {
