@@ -53,3 +53,18 @@ export const sections: SectionContent[] = [
     ],
   },
 ]
+
+/** The drawn version's third scene (the rib vault); the 3D scenes don't use it. */
+export const vaultSection: SectionContent = {
+  id: 'rib-vault',
+  kicker: 'Gothic structure · from c. 1140',
+  title: 'The Rib Vault',
+  body:
+    'Roofing a nave in stone means carrying a ceiling on nothing but its own ' +
+    'arches. The masons drew two ribs diagonally across each bay, crossing at ' +
+    'a boss, and framed the bay with four pointed arches that rise to exactly ' +
+    'the same height. Between the ribs the ceiling is only a thin shell of ' +
+    'stone. The weight no longer rests on the walls but runs down the ribs ' +
+    'into four piers, and the walls between them are free to become glass.',
+  calloutLabels: [],
+}

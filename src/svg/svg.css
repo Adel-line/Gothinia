@@ -20,7 +20,7 @@ body {
 
 /* the scroll runway; the drawing is fixed behind it */
 .runway {
-  height: 2000vh;
+  height: 3400vh;
 }
 
 .stage {
@@ -52,6 +52,13 @@ body {
 .ink.faint2 {
   stroke-width: calc(var(--px) * 0.8px);
   stroke-opacity: 0.32;
+}
+.ink.fadeout {
+  stroke: url(#vault-fade);
+}
+.ink.rib {
+  stroke: #e0b04a;
+  stroke-width: calc(var(--px) * 2px);
 }
 .ink.guide {
   stroke: var(--guide);
