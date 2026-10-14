@@ -16,7 +16,6 @@ import {
   roseOpenings,
   stringCourse,
 } from './geometry'
-import { RICH_RECT, buildRichRose } from './rich'
 
 /**
  * Prototype: the rose window as a mason's drawing brought to life.
@@ -98,13 +97,6 @@ defs.innerHTML = `
   <mask id="wall-mask" maskUnits="userSpaceOnUse" x="-500" y="-400" width="1000" height="900">
     <rect x="-500" y="-400" width="1000" height="900" fill="url(#wall-fade)"/>
   </mask>
-  <radialGradient id="rich-fade">
-    <stop offset="0.78" stop-color="#fff"/>
-    <stop offset="1" stop-color="#fff" stop-opacity="0"/>
-  </radialGradient>
-  <mask id="rich-mask" maskUnits="userSpaceOnUse" x="-300" y="-300" width="600" height="600">
-    <circle id="rich-mask-c" r="0" fill="url(#rich-fade)"/>
-  </mask>
   <radialGradient id="halo" cx="50%" cy="50%" r="50%">
     <stop offset="0.55" stop-color="#2b3f9a" stop-opacity="0.35"/>
     <stop offset="1" stop-color="#2b3f9a" stop-opacity="0"/>
@@ -146,18 +138,6 @@ const panes = roseOpenings.map((o, i) => {
   return { g, r: o.r }
 })
 const stone = el('path', { d: plateFill(), class: 'stone', 'fill-rule': 'evenodd', opacity: 0 }, lRose)
-
-// the real window, revealed over the drawing once it has been composed
-const richImg = el('image', {
-  x: RICH_RECT.x, y: RICH_RECT.y, width: RICH_RECT.w, height: RICH_RECT.h,
-  preserveAspectRatio: 'none', mask: 'url(#rich-mask)', opacity: 0,
-}, lRose)
-const richMask = svg.querySelector<SVGCircleElement>('#rich-mask-c')!
-let richReady = false
-buildRichRose().then((url) => {
-  richImg.setAttribute('href', url)
-  richReady = true
-})
 
 const setOut = el('g', { class: 'setout' }, lRose)
 const setRings = construction.rings.map((r) => drawn(circle(r), 'guide', setOut))
@@ -248,18 +228,6 @@ function render(p: number): void {
   setRadii.forEach((c, i) => setDraw(c, ease(ramp(p, 0.04 + (i % 12) * 0.006, 0.14 + (i % 12) * 0.006))))
   setOp(setOut, 0.55 * (1 - ramp(p, 0.3, 0.42)))
   roseInk.forEach(({ p: path, r }) => setDraw(path, ease(ramp(p, 0.02 + r * 0.24, 0.1 + r * 0.24))))
-  // 2b. the drawing becomes the real window, from the centre outward; the
-  // ink recedes as the carved stone takes over
-  const real = richReady ? ease(ramp(p, 0.42, 0.6)) : 0
-  const maskR = real * 230
-  richMask.setAttribute('r', maskR.toFixed(1))
-  richImg.setAttribute('opacity', richReady ? '1' : '0')
-  // a finished reveal needs no mask (cheaper to composite)
-  if (real >= 1) richImg.removeAttribute('mask')
-  else richImg.setAttribute('mask', 'url(#rich-mask)')
-  const inkFade = String(1 - 0.85 * real)
-  for (const { p: path } of roseInk) path.style.opacity = inkFade
-  for (const c of rims) c.style.opacity = inkFade
   rims.forEach((c, i) => setDraw(c, ease(ramp(p, 0.26 + i * 0.03, 0.36 + i * 0.03))))
   setOp(stone, ramp(p, 0.3, 0.42))
 
