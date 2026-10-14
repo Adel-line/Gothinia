@@ -13,9 +13,8 @@ import { ROSE } from './tracery'
  *     shafts with capitals at the springing;
  *   - the window wall inside it, flush with the rose's splayed reveal;
  *   - a deep string course under the rose;
- *   - the claire-voie below it: the row of paired lancets with standing
- *     figures. Its glass is the photo (tools/trace_rose.py); its lancets are
- *     built from the bay rhythm measured in the same photo.
+ *   - the claire-voie below it: a row of paired lancets, built from the bay
+ *     rhythm measured in the same photo (tools/trace_rose.py).
  *
  * Window plane = XY facing +Z, origin at the rose's centre.
  */

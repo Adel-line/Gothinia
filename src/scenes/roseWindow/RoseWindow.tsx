@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
 import { buildRoseGeometries, ROSE } from './tracery'
-import { buildFrameGeometries } from './frame'
+import { FRAME, buildFrameGeometries, claireOpenings } from './frame'
 import { makeLimestone } from '../../three/materials/limestone'
-import { makePhotoGlassMaterial } from '../../three/materials/photoGlass'
+import { makeStainedGlassMaterial } from '../../three/materials/stainedGlass'
+import { buildGlassLayout } from '../../three/glassLayout'
 
 function loadRelief(file: string): THREE.Texture {
   const tex = new THREE.TextureLoader().load(`${import.meta.env.BASE_URL}textures/${file}`)
@@ -36,7 +37,7 @@ function revealBounce(): THREE.DataTexture {
 }
 
 export function RoseWindow() {
-  const { stoneGeometry, moldingGeometry, splayGeometry } = useMemo(buildRoseGeometries, [])
+  const { stoneGeometry, moldingGeometry, splayGeometry, openings } = useMemo(buildRoseGeometries, [])
   const frame = useMemo(buildFrameGeometries, [])
 
   // walls: ashlar, with voussoirs round the rose
@@ -62,8 +63,23 @@ export function RoseWindow() {
   // carved members (rolls, capitals, string course): the same stone, a shade
   // darker with a little more wear
   const carved = useMemo(() => makeLimestone({ color: '#a9a69e', roughness: 0.85 }), [])
-  const roseGlass = useMemo(() => makePhotoGlassMaterial('rose-glass.webp'), [])
-  const claireGlass = useMemo(() => makePhotoGlassMaterial('claire-glass.webp'), [])
+  // drawn glass, laid out per opening from the same outlines as the stone
+  const roseGlass = useMemo(() => {
+    const R = ROSE.textureRadius
+    const rect = { x0: -R, y0: -R, w: 2 * R, h: 2 * R }
+    const layout = buildGlassLayout(openings.map((o) => o.points), rect, 2048, 2048)
+    return makeStainedGlassMaterial(layout, rect)
+  }, [openings])
+  const claireGlass = useMemo(() => {
+    const rect = {
+      x0: -FRAME.half,
+      y0: FRAME.claireBottom,
+      w: 2 * FRAME.half,
+      h: FRAME.claireTop - FRAME.claireBottom,
+    }
+    const layout = buildGlassLayout(claireOpenings(), rect, 2048, Math.round((2048 * rect.h) / rect.w))
+    return makeStainedGlassMaterial(layout, rect, { saddle: 0.45 })
+  }, [])
 
   return (
     <group>
