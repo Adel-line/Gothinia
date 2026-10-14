@@ -6,9 +6,10 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        // the drawn experience (SVG) is the site
         main: 'index.html',
-        // prototype: the rose as an animated drawing (SVG)
-        svg: 'svg.html',
+        // the earlier 3D version, kept for reference
+        '3d': '3d.html',
       },
     },
   },
