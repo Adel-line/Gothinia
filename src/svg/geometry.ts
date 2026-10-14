@@ -20,6 +20,8 @@ export interface Opening {
   theta: number
   /** which ring it belongs to: 0 oculus … 5 outer trefoils */
   ring: number
+  /** outline, flat [x0, y0, x1, y1, …] in svg units */
+  pts: number[]
 }
 
 function ringOf(r: number): number {
@@ -34,10 +36,10 @@ function ringOf(r: number): number {
 const f = (v: number) => v.toFixed(2)
 
 export const roseOpenings: Opening[] = traced.openings.map((o) => {
-  const p = o.points
-  let d = `M${f(p[0] * U)} ${f(-p[1] * U)}`
-  for (let i = 2; i < p.length; i += 2) d += `L${f(p[i] * U)} ${f(-p[i + 1] * U)}`
-  return { d: d + 'Z', r: o.r, theta: o.theta, ring: ringOf(o.r) }
+  const pts = o.points.map((v, i) => (i % 2 ? -v : v) * U)
+  let d = `M${f(pts[0])} ${f(pts[1])}`
+  for (let i = 2; i < pts.length; i += 2) d += `L${f(pts[i])} ${f(pts[i + 1])}`
+  return { d: d + 'Z', r: o.r, theta: o.theta, ring: ringOf(o.r), pts }
 })
 
 export const PLATE_R = traced.plateRadius * U // 109
