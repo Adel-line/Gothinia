@@ -20,7 +20,7 @@ body {
 
 /* the scroll runway; the drawing is fixed behind it */
 .runway {
-  height: 900vh;
+  height: 1800vh;
 }
 
 .stage {
@@ -52,6 +52,43 @@ body {
 .ink.guide {
   stroke: var(--guide);
   stroke-width: calc(var(--px) * 0.8px);
+}
+
+.ink.dashed {
+  stroke-dasharray: calc(var(--px) * 3px) calc(var(--px) * 4px);
+}
+.dot {
+  fill: var(--ink);
+}
+.force,
+.flow,
+.push {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.force {
+  stroke: var(--ink);
+  stroke-width: calc(var(--px) * 1.4px);
+}
+.flow {
+  stroke: #e0a53a;
+  stroke-width: calc(var(--px) * 2.2px);
+}
+.push {
+  stroke: #d0434f;
+  stroke-width: calc(var(--px) * 1.8px);
+}
+.label {
+  fill: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.08em;
+}
+.label.side {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-style: italic;
+  letter-spacing: 0;
+  fill: var(--guide);
 }
 
 .stone {

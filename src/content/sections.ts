@@ -35,16 +35,16 @@ export const sections: SectionContent[] = [
   },
   {
     id: 'pointed-arch',
-    kicker: 'Duomo di Milano · Milan · Lombard Gothic',
+    kicker: 'Gothic structure · from c. 1140',
     title: 'The Pointed Arch',
     body:
-      'The pointed arch is two circular arcs leaning together, and that break ' +
-      'at the crown changes everything: thrust that a round arch spreads ' +
-      'sideways is steered steeply down into the piers, so walls could rise ' +
-      'far higher on far less stone. In Milan the arcade pushes the idea to ' +
-      'its limit — clustered piers as tall as a six-storey building carry ' +
-      'tier upon tier of arches, and daylight enters only high above, ' +
-      'through the glazed lancets of the clerestory.',
+      'Every lancet under the rose ends in the same figure: two arcs, each ' +
+      'struck from the opposite side, leaning together at the top. A round ' +
+      'arch can only rise half as high as it is wide, and its weight pushes ' +
+      'outward, trying to spread its walls apart. Break it at the crown and ' +
+      'the arch climbs higher on the same span, and its weight turns ' +
+      'downward, into the piers. That small change let builders reach ' +
+      'heights that had once seemed impossible.',
     calloutLabels: [
       'Two-centred apex',
       'Clustered pier',

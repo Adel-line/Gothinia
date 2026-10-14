@@ -113,6 +113,10 @@ export interface Lancet {
   d: string
   /** 0..1 across the row, for staggering */
   x: number
+  /** centre line, clear width, and the springing of its pointed head */
+  cx: number
+  w: number
+  springY: number
 }
 
 export function claireVoie(): { lancets: Lancet[]; foils: string } {
@@ -131,8 +135,10 @@ export function claireVoie(): { lancets: Lancet[]; foils: string } {
     const x0 = -FRAME.half + b * bay + major / 2
     const c1 = x0 + w / 2
     const c2 = x0 + w + minor + w / 2
-    lancets.push({ d: lancet(c1, w, apexY, footY), x: (c1 + FRAME.half) / span })
-    lancets.push({ d: lancet(c2, w, apexY, footY), x: (c2 + FRAME.half) / span })
+    const springY = apexY + w * Math.sin(Math.PI / 3)
+    for (const c of [c1, c2]) {
+      lancets.push({ d: lancet(c, w, apexY, footY), x: (c + FRAME.half) / span, cx: c, w, springY })
+    }
     foils += quatrefoil((c1 + c2) / 2, top + 0.6 * W, 0.12 * W)
   }
   return { lancets, foils }
