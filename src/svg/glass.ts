@@ -198,19 +198,16 @@ function ensureDefs(defs: Element): void {
       id: `gl-blot-${v}`, cx: `${30 + hash(v * 7 + 1) * 40}%`, cy: `${28 + hash(v * 7 + 2) * 44}%`, r: `${34 + hash(v * 7 + 3) * 24}%`,
       gradientTransform: `rotate(${(hash(v * 7 + 4) * 180).toFixed(0)} .5 .5) translate(${(0.5 - 0.5 * (0.6 + hash(v * 7 + 5) * 0.8)).toFixed(3)} 0) scale(${(0.6 + hash(v * 7 + 5) * 0.8).toFixed(3)} 1)`,
     }, defs)
-    el('stop', { offset: 0, 'stop-color': dark ? '#00000c' : '#fff3dc', 'stop-opacity': dark ? 0.34 : 0.2 }, g)
-    el('stop', { offset: 1, 'stop-color': dark ? '#00000c' : '#fff3dc', 'stop-opacity': 0 }, g)
+    // gentle: a faint deepening and a faint lightening, never a stain
+    el('stop', { offset: 0, 'stop-color': dark ? '#00001a' : '#fff6e4', 'stop-opacity': dark ? 0.09 : 0.12 }, g)
+    el('stop', { offset: 1, 'stop-color': dark ? '#00001a' : '#fff6e4', 'stop-opacity': 0 }, g)
   }
 
   // grain: bubbles and cloudy streaks — the only feTurbulence in the glass
   const grainF = el('filter', { id: 'gl-grain-f', x: 0, y: 0, width: '100%', height: '100%', 'color-interpolation-filters': 'sRGB' }, defs)
-  el('feTurbulence', { type: 'fractalNoise', baseFrequency: '0.045 0.07', numOctaves: 2, seed: 23, result: 'cloud' }, grainF)
-  el('feColorMatrix', { in: 'cloud', type: 'matrix', values: '0 0 0 0 0.02  0 0 0 0 0.02  0 0 0.2 0 0.06  3.4 0 0 0 -1.5', result: 'dark' }, grainF)
-  el('feTurbulence', { type: 'fractalNoise', baseFrequency: '0.8 0.9', numOctaves: 1, seed: 5, result: 'speck' }, grainF)
-  el('feColorMatrix', { in: 'speck', type: 'matrix', values: '0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.9  11 0 0 0 -7.9', result: 'bubbles' }, grainF)
-  el('feMerge', {}, grainF).append(
-    el('feMergeNode', { in: 'dark' }), el('feMergeNode', { in: 'bubbles' }),
-  )
+  // bubbles only: sparse, tiny, pale. (stitchTiles keeps the tile seamless; no dark streaks)
+  el('feTurbulence', { type: 'fractalNoise', baseFrequency: '0.8 0.9', numOctaves: 1, seed: 5, stitchTiles: 'stitch', result: 'speck' }, grainF)
+  el('feColorMatrix', { in: 'speck', type: 'matrix', values: '0 0 0 0 1  0 0 0 0 0.97  0 0 0 0 0.9  14 0 0 0 -10.9' }, grainF)
   const grain = el('pattern', { id: 'gl-grain', width: 80, height: 80, patternUnits: 'userSpaceOnUse' }, defs)
   el('rect', { width: 80, height: 80, filter: 'url(#gl-grain-f)', fill: '#000' }, grain)
 
@@ -221,7 +218,7 @@ function ensureDefs(defs: Element): void {
   }, defs)
   el('feTurbulence', { type: 'fractalNoise', baseFrequency: '0.05 0.06', numOctaves: 2, seed: 4, result: 'warp' }, dist)
   distortEl = el('feDisplacementMap', { in: 'SourceGraphic', in2: 'warp', scale: 0, xChannelSelector: 'R', yChannelSelector: 'G' }, dist)
-  distortScale = 0.7
+  distortScale = 0.35
 
   // painted details, in local units (axis along +x; length ~10)
   const frond = el('g', { id: 'gl-frond' }, defs)
@@ -395,7 +392,7 @@ export function glassPane(
   el('use', { href: ref, fill: `url(#gl-blot-${(b0 + 1 + Math.floor(h(10) * 3)) % 4})` }, fx)
   el('use', { href: ref, fill: `url(#gl-blot-${4 + Math.floor(h(11) * 2)})` }, fx)
   el('use', { href: ref, fill: 'url(#gl-sun)' }, fx)
-  el('use', { href: ref, fill: GRAIN_FILL }, fx)
+  el('use', { href: ref, fill: GRAIN_FILL, 'fill-opacity': 0.7 }, fx)
   // thickness, over all of it: luminous heart, dense rim
   use(body, { fill: 'url(#gl-thick)' })
 

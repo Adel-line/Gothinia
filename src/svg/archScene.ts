@@ -357,7 +357,7 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     const layer = (fill: string, extra: Record<string, string | number> = {}) => el('path', { d: opening, fill, ...extra }, w)
     // the ground: cobalt, in hand-cut pieces, with the glass's own mottling
     layer(glassFill(defs, 'blue', n))
-    layer(mosaicFill(defs, 'blue', n * 3, 5.2 * k, true))
+    layer(mosaicFill(defs, 'blue', n * 3, 3.9 * k, false))
     layer(pigmentFill(n))
     // ruby border band, with a lead came on its inner edge
     const band = (stroke: string, width: number, extra: Record<string, string | number> = {}) =>
@@ -385,7 +385,7 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     el('path', { d: bars, stroke: GLASS.lead, 'stroke-width': S(1.6), fill: 'none' }, w)
     layer(THICK_FILL)
     // bubbles and cloudy streaks, only while the view is at rest
-    el('path', { d: opening, fill: GRAIN_FILL }, el('g', { class: 'gl-fx' }, w))
+    el('path', { d: opening, fill: GRAIN_FILL, 'fill-opacity': 0.7 }, el('g', { class: 'gl-fx' }, w))
     // light spilling out of the window: stacked soft strokes, no blur filter
     for (const [sw, a] of [[22, 0.04], [13, 0.06], [6, 0.1]]) {
       el('path', { d: opening, stroke: '#4a66e0', 'stroke-width': S(sw), 'stroke-opacity': a }, gGlow)
