@@ -39,16 +39,17 @@ interface FamilySpec {
 
 const FAMILIES: Record<Exclude<Family, 'multi'>, FamilySpec> = {
   blue: {
-    cells: ['#2b5cf0', '#2744c8', '#3d74ff', '#1f38b4', '#5a8cff', '#3550d0', '#6a64f0', '#b4c8ff'],
+    cells: ['#2b5cf0', '#2744c8', '#3d74ff', '#1f38b4', '#3a86e8', '#2a4fc0', '#2f6fdc', '#a9c4ff'],
     stops: [[0, '#6d9fff'], [0.4, '#3a68f5'], [0.8, '#2338ac'], [1, '#0a1450']],
   },
   violet: {
     cells: ['#7a48ee', '#6638d0', '#9560f2', '#5430b0', '#b074ff', '#4a46d0', '#d04cb0', '#c9b4ff'],
     stops: [[0, '#b27cff'], [0.4, '#8248f0'], [0.8, '#44259f'], [1, '#14083e']],
   },
+  // dark, deep reds: crimson and ruby, no pink and no orange
   ruby: {
-    cells: ['#ec2a3c', '#cc2038', '#ff4a68', '#aa1630', '#f03c80', '#d83048', '#ff7040', '#ffa6b6'],
-    stops: [[0, '#ff5c72'], [0.4, '#e22a40'], [0.8, '#8c1022'], [1, '#2c050f']],
+    cells: ['#b81c2c', '#9c1628', '#c8283a', '#82101f', '#ac1a2c', '#8e1424', '#be2a38', '#a01a2a'],
+    stops: [[0, '#e03a4c'], [0.4, '#b81c2c'], [0.8, '#6e0c1c'], [1, '#22040a']],
   },
   amber: {
     cells: ['#f6b42a', '#ee9c1e', '#ffd25a', '#de821a', '#fbc848', '#cc741a'],
@@ -58,9 +59,10 @@ const FAMILIES: Record<Exclude<Family, 'multi'>, FamilySpec> = {
     cells: ['#f2f0fc', '#dedef6', '#fcf8ff', '#cdcdee', '#ede4f6'],
     stops: [[0, '#ffffff'], [0.5, '#e4e2f8'], [0.85, '#9a9acc'], [1, '#3c3c6a']],
   },
+  // bottle and olive greens
   green: {
-    cells: ['#32a45e', '#267e4e', '#4cb674', '#1c6e54'],
-    stops: [[0, '#70d89c'], [0.45, '#32a45e'], [0.8, '#155b39'], [1, '#04210f']],
+    cells: ['#3a8a56', '#2b6e48', '#55a06c', '#7a9a48', '#2f7a5a', '#4a9060', '#6aa878', '#bcd8bc'],
+    stops: [[0, '#74c890'], [0.42, '#3a8a56'], [0.8, '#1a5238'], [1, '#05200f']],
   },
 }
 const cellsOf = (f: Family): string[] =>
@@ -220,22 +222,35 @@ function ensureDefs(defs: Element): void {
   distortEl = el('feDisplacementMap', { in: 'SourceGraphic', in2: 'warp', scale: 0, xChannelSelector: 'R', yChannelSelector: 'G' }, dist)
   distortScale = 0.35
 
-  // painted details, in local units (axis along +x; length ~10)
-  const frond = el('g', { id: 'gl-frond' }, defs)
+  // painted details, in local units. The fill comes from the <use>, so one drawing
+  // serves dark paint on pale glass and pale paint on dark.
+  // fleur-de-lis, pointing up, about two units tall
+  const fleur = el('g', { id: 'gl-fleur' }, defs)
   el('path', {
-    d: 'M0 0C2.6 -1.7 5.4 1.7 8.6 -0.2M8.6 -0.2a1.15 1.15 0 1 0 -1.3 -1.3M2.3 -0.55q0.7 -2.5 2.7 -2.8q-0.1 2.2 -2.7 2.8ZM4.9 0.55q0.5 2.5 2.6 2.7q0 -2.1 -2.6 -2.7ZM6.6 -0.9q1.1 -1.9 3 -1.6q-0.7 1.7 -3 1.6Z',
-    fill: LEAD, 'fill-opacity': 0.55, stroke: LEAD, 'stroke-width': 0.32, 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
-  }, frond)
-  el('circle', { cx: 9.9, cy: -2.4, r: 0.42, fill: '#f2b232' }, frond)
-  const rosette = el('g', { id: 'gl-rosette' }, defs)
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2
-    el('ellipse', {
-      cx: Math.cos(a) * 0.52, cy: Math.sin(a) * 0.52, rx: 0.42, ry: 0.2, transform: `rotate(${(a * 180) / Math.PI} ${Math.cos(a) * 0.52} ${Math.sin(a) * 0.52})`,
-      fill: LEAD, 'fill-opacity': 0.5, stroke: LEAD, 'stroke-width': 0.1,
-    }, rosette)
+    d: 'M0 -1C0.3 -0.62 0.34 -0.18 0.13 0.2L0.13 0.3H-0.13L-0.13 0.2C-0.34 -0.18 -0.3 -0.62 0 -1Z' +
+      'M-0.15 0.28C-0.58 0.24 -0.92 -0.06 -0.84 -0.46C-0.79 -0.7 -0.56 -0.74 -0.5 -0.58C-0.46 -0.45 -0.56 -0.38 -0.64 -0.42C-0.6 -0.2 -0.4 0 -0.15 0.06Z' +
+      'M0.15 0.28C0.58 0.24 0.92 -0.06 0.84 -0.46C0.79 -0.7 0.56 -0.74 0.5 -0.58C0.46 -0.45 0.56 -0.38 0.64 -0.42C0.6 -0.2 0.4 0 0.15 0.06Z' +
+      'M-0.46 0.38H0.46V0.54H-0.46ZM0 0.62C0.22 0.76 0.2 0.92 0 1C-0.2 0.92 -0.22 0.76 0 0.62Z',
+  }, fleur)
+  // ivy leaf, pointing up, about two units tall, with its veins
+  const leaf = el('g', { id: 'gl-leaf' }, defs)
+  el('path', {
+    d: 'M0 0.95C-0.12 0.52 -0.92 0.5 -0.82 -0.1C-0.77 -0.4 -0.5 -0.5 -0.38 -0.56C-0.32 -0.82 -0.12 -0.96 0 -1C0.12 -0.96 0.32 -0.82 0.38 -0.56C0.5 -0.5 0.77 -0.4 0.82 -0.1C0.92 0.5 0.12 0.52 0 0.95Z',
+    stroke: LEAD, 'stroke-width': 0.09, 'stroke-linejoin': 'round',
+  }, leaf)
+  el('path', {
+    d: 'M0 0.9V-0.6M0 0.3L-0.4 -0.1M0 0.3L0.4 -0.1M0 -0.1L-0.25 -0.4M0 -0.1L0.25 -0.4',
+    stroke: LEAD, 'stroke-width': 0.06, 'stroke-opacity': 0.7, fill: 'none', 'stroke-linecap': 'round',
+  }, leaf)
+  // a trefoil of leaves
+  const tre = el('g', { id: 'gl-trefoil' }, defs)
+  for (const a of [0, 120, 240]) el('use', { href: '#gl-leaf', transform: `rotate(${a}) translate(0 -0.62) scale(0.62)` }, tre)
+  // a vine: a stem with leaves along it, in pale grisaille (axis +x, about eight units long)
+  const vine = el('g', { id: 'gl-vine' }, defs)
+  el('path', { d: 'M0 0C2.2 -1.3 4.4 1.3 7.6 0', stroke: '#e6e2f6', 'stroke-width': 0.34, 'stroke-linecap': 'round', fill: 'none', 'stroke-opacity': 0.9 }, vine)
+  for (const [tx, ty, r, sc] of [[2.6, -0.9, 20, 1.2], [5.0, 0.95, 160, 1.05], [7.9, 0, 90, 1.35]] as const) {
+    el('use', { href: '#gl-leaf', transform: `translate(${tx} ${ty}) rotate(${r}) scale(${sc})`, fill: '#ece9f8', 'fill-opacity': 0.86 }, vine)
   }
-  el('circle', { r: 0.2, fill: '#f6c34a' }, rosette)
 }
 
 /**
@@ -320,9 +335,11 @@ export interface PaneSpec {
   variant: number
   /** size of one piece, in drawing units */
   cell: number
-  /** a pearled medallion on the axis, in this family */
+  /** a pearled medallion on the axis, in this family, with a painted motif (pale paint on dark glass) */
   medallion?: Family
-  /** fronds up and down the axis */
+  motif?: 'fleur' | 'trefoil'
+  inkPale?: boolean
+  /** pale vines up and down the axis */
   fronds?: boolean
   /** pearls along the rim */
   pearls?: boolean
@@ -414,7 +431,12 @@ export function glassPane(
       r: r * 0.84, fill: 'none', stroke: '#efe9ff', 'stroke-width': Math.max(0.4, r * 0.11), 'stroke-linecap': 'round',
       'stroke-dasharray': `0.001 ${((2 * Math.PI * r * 0.84) / Math.round(r * 5.6)).toFixed(3)}`, 'stroke-opacity': 0.88,
     }, m)
-    el('use', { href: '#gl-rosette', transform: `rotate(${(h(5) * 60).toFixed(1)}) scale(${(r * 0.5).toFixed(3)})`, opacity: 0.8 }, m)
+    // a painted fleur-de-lis or a trefoil of leaves, dark on pale glass and pale on dark
+    el('use', {
+      href: spec.motif === 'trefoil' ? '#gl-trefoil' : '#gl-fleur',
+      fill: spec.inkPale ? '#f3f0fc' : LEAD, 'fill-opacity': spec.inkPale ? 0.95 : 0.9,
+      transform: `scale(${(r * (spec.motif === 'trefoil' ? 0.7 : 0.6)).toFixed(3)})`,
+    }, m)
   }
   if (spec.fronds) {
     // a frond up and a frond down the axis, alike but never identical
@@ -423,9 +445,9 @@ export function glassPane(
       const [fxp, fyp] = at(t)
       const s = (Math.min(geo.len * 0.17, geo.wid * 0.95) * (0.9 + h(7 + t) * 0.25)) / 10
       el('use', {
-        href: '#gl-frond',
+        href: '#gl-vine',
         transform: `translate(${fxp.toFixed(2)} ${fyp.toFixed(2)}) rotate(${((geo.ang * 180) / Math.PI + (dir === 1 ? 0 : 180)).toFixed(1)}) scale(${s.toFixed(3)} ${(s * flip).toFixed(3)})`,
-        opacity: 0.75,
+        opacity: 0.9,
       }, paint)
     }
   }
@@ -459,24 +481,38 @@ export function glassPane(
 // ---- the rose ---------------------------------------------------------------------------
 /** the colours of the rose's panes, ring by ring: after the north rose of Notre-Dame */
 export function rosePaneSpec(ring: number, i: number): PaneSpec {
-  const pick = <T,>(...xs: T[]) => xs[i % xs.length]
+  // classic colours only: blue, dark red and green, with gold and pale glass for the medallions
+  const loc = i - [0, 1, 13, 37, 61, 85][ring] // index within the ring, so the alternation staggers
+  const onBlue = (n: number): Pick<PaneSpec, 'medallion' | 'inkPale'> => (n % 2 ? { medallion: 'amber' } : { medallion: 'ruby', inkPale: true })
+  const onRuby = (n: number): Pick<PaneSpec, 'medallion' | 'inkPale'> => (n % 2 ? { medallion: 'blue', inkPale: true } : { medallion: 'pale' })
   switch (ring) {
-    case 0: return { base: 'ruby', mosaic: 'multi', variant: 0, cell: 1.5, medallion: 'amber', pearls: true, lead: 1.5 }
-    case 1: return { base: pick<Family>('blue', 'violet', 'blue'), mosaic: pick<Family>('blue', 'violet', 'ruby'), variant: i, cell: 2.6, trellis: true, medallion: pick<Family>('ruby', 'pale', 'amber', 'ruby'), fronds: true }
-    case 2: return { base: pick<Family>('violet', 'blue'), mosaic: pick<Family>('violet', 'blue', 'violet', 'ruby'), variant: i, cell: 2.3, trellis: true, medallion: pick<Family>('pale', 'ruby', 'amber'), fronds: true }
-    case 3: return { base: 'ruby', mosaic: pick<Family>('ruby', 'ruby', 'violet'), variant: i, cell: 1.5, pearls: true, lead: 1.0 }
-    case 4: return { base: pick<Family>('amber', 'pale', 'amber', 'green'), mosaic: 'amber', variant: i, cell: 1.1, pearls: false, lead: 0.9 }
-    default: return { base: 'violet', mosaic: 'multi', variant: i, cell: 1.7, pearls: true, lead: 1.0 }
+    case 0: return { base: 'ruby', mosaic: 'ruby', variant: 0, cell: 1.5, medallion: 'amber', motif: 'fleur', pearls: true, lead: 1.5 }
+    case 1: {
+      const blue = loc % 2 === 0
+      return {
+        base: blue ? 'blue' : 'ruby', mosaic: blue ? 'blue' : 'ruby', variant: loc, cell: 2.6, trellis: true,
+        ...(blue ? onBlue(loc >> 1) : onRuby(loc >> 1)), motif: 'fleur', fronds: true,
+      }
+    }
+    case 2: {
+      const kind = (['blue', 'ruby', 'blue', 'green'] as const)[loc % 4]
+      return {
+        base: kind, mosaic: kind, variant: loc, cell: 2.3, trellis: true,
+        ...(kind === 'ruby' ? onRuby(loc >> 2) : kind === 'blue' ? onBlue(loc >> 2) : { medallion: 'amber' }), motif: 'trefoil', fronds: true,
+      }
+    }
+    case 3: { const f: Family = loc % 2 ? 'blue' : 'ruby'; return { base: f, mosaic: f, variant: loc, cell: 1.5, pearls: true, lead: 1.0 } }
+    case 4: { const f: Family = loc % 2 ? 'pale' : 'amber'; return { base: f, mosaic: f, variant: loc, cell: 1.1, lead: 0.9 } }
+    default: { const f: Family = loc % 2 ? 'green' : 'blue'; return { base: f, mosaic: f, variant: loc, cell: 1.7, pearls: true, lead: 1.0 } }
   }
 }
 
-/** the colours of the claire-voie lancets: blue and ruby in turn, with a violet now and then */
+/** the colours of the claire-voie lancets: blue and dark red in turn, with the odd green one */
 export function lancetSpec(i: number): PaneSpec {
-  const ruby = i % 4 === 1
+  const kind = i % 4 === 1 ? 'ruby' : i % 8 === 6 ? 'green' : 'blue'
   return {
-    base: ruby ? 'ruby' : i % 5 === 3 ? 'violet' : 'blue',
-    mosaic: ruby ? 'ruby' : i % 5 === 3 ? 'violet' : 'blue',
-    variant: i, cell: 2.6, trellis: true, medallion: ruby ? 'amber' : 'pale', fronds: true, lead: 0.9,
+    base: kind, mosaic: kind, variant: i, cell: 2.6, trellis: true, lead: 0.9, fronds: true, motif: 'fleur',
+    ...(kind === 'blue' ? { medallion: 'ruby' as Family, inkPale: true } : { medallion: 'amber' as Family }),
   }
 }
 
