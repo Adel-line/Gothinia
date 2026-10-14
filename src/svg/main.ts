@@ -7,16 +7,20 @@ import {
   FRAME,
   U,
   archOrder,
+  archBand,
+  archJoints,
   ashlar,
-  capitals,
   circle,
   claireVoie,
   construction,
+  dogtooth,
+  nookShafts,
   plateFill,
+  roseJoints,
   roseOpenings,
   stringCourse,
 } from './geometry'
-import { drawn, ease, el, lerp, ramp, setDraw, setOp } from './dom'
+import { drawn, ease, ease5, el, monotone, ramp, setDraw, setOp, setShow, smoothDamp } from './dom'
 import { ROUND_X, buildArchScene } from './archScene'
 
 /**
@@ -79,9 +83,6 @@ defs.innerHTML = `
     <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
     <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
   </radialGradient>
-  <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-    <feGaussianBlur stdDeviation="6"/>
-  </filter>
   <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#5b74d6" stop-opacity="0.32"/>
     <stop offset="0.5" stop-color="#7b5fb0" stop-opacity="0.12"/>
@@ -110,6 +111,7 @@ const lFrame = el('g', { class: 'layer' }, svg)
 const SPAN = 420
 const wallLines = drawn(ashlar(SPAN, -260, FRAME.footY), 'faint', lWall)
 const stringLine = drawn(stringCourse(SPAN), 'fine', lWall)
+const toothLine = drawn(dogtooth(SPAN), 'fine', lWall)
 
 // light shafts falling from the rose into the nave (towards the viewer)
 const shafts = [
@@ -120,9 +122,10 @@ const shafts = [
 
 // rose: halo, glass (with a blurred copy for glow), stone plate, ink
 const halo = el('circle', { r: PLATE_R * 1.5, fill: 'url(#halo)', opacity: 0 }, lRose)
+// light bleeding past the rim of each pane: stacked soft strokes, not a blur
+// filter (a live filter re-rasterises the whole rose on every camera move)
+const bleed = el('g', { opacity: 0, 'stroke-linejoin': 'round', fill: 'none' }, lRose)
 const glassAll = el('g', { id: 'glass-all' }, lRose)
-const glowUse = el('use', { href: '#glass-all', filter: 'url(#glow)', opacity: 0, class: 'glow' }, lRose)
-lRose.insertBefore(glowUse, glassAll)
 const panes = roseOpenings.map((o, i) => {
   const { ground, border } = paneColours(o.ring, i)
   const cid = `c${i}`
@@ -132,9 +135,13 @@ const panes = roseOpenings.map((o, i) => {
   el('path', { d: o.d, fill: 'url(#quarry)' }, g)
   el('path', { d: o.d, fill: 'none', stroke: border, 'stroke-width': o.ring === 0 ? 5 : 3.2 }, g)
   el('path', { d: o.d, fill: 'url(#pane-light)' }, g)
+  for (const [w, a] of [[9, 0.07], [5, 0.1]]) el('path', { d: o.d, stroke: ground, 'stroke-width': w, 'stroke-opacity': a }, bleed)
   return { g, r: o.r }
 })
 const stone = el('path', { d: plateFill(), class: 'stone', 'fill-rule': 'evenodd', opacity: 0 }, lRose)
+// the rim: a ring of voussoirs between the plate and the reveal
+const rimBand = el('path', { d: circle(REVEAL_R) + circle(PLATE_R), class: 'stone b', 'fill-rule': 'evenodd', opacity: 0 }, lRose)
+const rimJoints = drawn(roseJoints(), 'faint2', lRose)
 
 const setOut = el('g', { class: 'setout' }, lRose)
 const setRings = construction.rings.map((r) => drawn(circle(r), 'guide', setOut))
@@ -143,8 +150,9 @@ const setRadii = construction.radii.map((d) => drawn(d, 'guide', setOut))
 const roseInk = roseOpenings.map((o) => ({ p: drawn(o.d, 'fine', lRose), r: o.r }))
 const rims = [U * 1.0, PLATE_R, REVEAL_R].map((r) => drawn(circle(r), 'fine', lRose))
 
-// claire-voie
+// claire-voie: paired lancets, each pair under an arch whose head is a pierced plate
 const cv = claireVoie()
+const bayPlates = el('path', { d: cv.bays.map((b) => b.plate).join(''), class: 'stone a', 'fill-rule': 'evenodd', opacity: 0 }, lClaire)
 const claireGlass = cv.lancets.map((l, i) => {
   const cid = `l${i}`
   el('clipPath', { id: cid }, defs).appendChild(el('path', { d: l.d }))
@@ -155,13 +163,26 @@ const claireGlass = cv.lancets.map((l, i) => {
   el('path', { d: l.d, fill: 'url(#pane-light)' }, g)
   return { g, x: l.x }
 })
+// the oculus in each head: a ruby light with a cobalt quatrefoil at its heart
+const oculusGlass = cv.bays.map((b, i) => {
+  const g = el('g', { opacity: 0 }, lClaire)
+  el('path', { d: b.oculus, fill: i % 2 ? GLASS.cobalt : GLASS.ruby }, g)
+  el('path', { d: b.foil, fill: i % 2 ? GLASS.ruby : GLASS.cobalt, stroke: GLASS.gold, 'stroke-width': 0.5 }, g)
+  return { g, x: b.x }
+})
 const claireInk = cv.lancets.map((l) => ({ p: drawn(l.d, 'fine', lClaire), x: l.x }))
+const bayInk = cv.bays.map((b) => ({ p: drawn(b.arch + b.oculus, 'fine', lClaire), x: b.x }))
+const foilInk = drawn(cv.bays.map((b) => b.foil).join(''), 'fine', lClaire)
 
-const foilInk = drawn(cv.foils, 'fine', lClaire)
-
-// frame: arch orders and capitals
+// frame: the arch as moulded stone — bands between the orders, voussoir joints,
+// nook shafts with their capitals and bases
+const nooks = nookShafts()
+const bandA = el('path', { d: archBand(0, 5) + archBand(13, 21), class: 'stone a', opacity: 0 }, lFrame)
+const bandB = el('path', { d: archBand(5, 13) + archBand(21, 29), class: 'stone b', opacity: 0 }, lFrame)
+const shaftFill = el('path', { d: nooks.fill, class: 'stone a', opacity: 0 }, lFrame)
 const orderInk = ORDERS.map((o) => drawn(archOrder(o), o === 0 ? 'bold' : 'fine', lFrame))
-const capInk = drawn(capitals(), 'fine', lFrame)
+const jointInk = drawn(archJoints(), 'faint2', lFrame)
+const capInk = drawn(nooks.ink, 'fine', lFrame)
 
 // ---- scene 2: the pointed arch, where the rose stood ------------------------------
 // the pair of arches (local x −68 … ROUND_X + 68, y −150 … 250) is centred
@@ -204,16 +225,17 @@ const SHOTS: [number, Shot][] = [
   [S1, { cx: -95, cy: 34, w: 560, h: 452 }],
   [0.5, { cx: -95, cy: 34, w: 560, h: 452 }],
 ]
+// one monotone cubic per channel through every shot: the dolly keeps a
+// continuous velocity through the waypoints and only comes to rest on a hold
+const ALL_SHOTS = SHOTS.concat(SHOTS2)
+const keys = ALL_SHOTS.map(([p]) => p)
+const camCx = monotone(keys, ALL_SHOTS.map(([, s]) => s.cx))
+const camCy = monotone(keys, ALL_SHOTS.map(([, s]) => s.cy))
+// zoom in log space so the dolly moves at an even pace
+const camLw = monotone(keys, ALL_SHOTS.map(([, s]) => Math.log(s.w)))
+const camLh = monotone(keys, ALL_SHOTS.map(([, s]) => Math.log(s.h)))
 function camera(p: number): Shot {
-  const shots = SHOTS.concat(SHOTS2)
-  let i = 0
-  while (i < shots.length - 2 && p > shots[i + 1][0]) i++
-  const [p0, a] = shots[i]
-  const [p1, b] = shots[i + 1]
-  const t = ease(ramp(p, p0, p1))
-  // zoom in log space so the dolly moves at an even pace
-  const lw = (x: number, y: number) => Math.exp(lerp(Math.log(x), Math.log(y), t))
-  return { cx: lerp(a.cx, b.cx, t), cy: lerp(a.cy, b.cy, t), w: lw(a.w, b.w), h: lw(a.h, b.h) }
+  return { cx: camCx(p), cy: camCy(p), w: Math.exp(camLw(p)), h: Math.exp(camLh(p)) }
 }
 
 
@@ -226,8 +248,8 @@ function camera(p: number): Shot {
  * while the transition is running.
  */
 function buildFragments() {
-  const N = 1400
-  const LEN = 2.4 // drawing units per piece
+  const N = 2200
+  const LEN = 3 // drawing units per piece
   const sampler = el('path', {}, defs)
   /** N points spread over the outlines in proportion to their length */
   function sample(ds: string[]): { x: number; y: number; a: number; r: number }[] {
@@ -256,6 +278,7 @@ function buildFragments() {
     circle(U), circle(PLATE_R), circle(REVEAL_R),
     ...ORDERS.map((o) => archOrder(o)),
     ...cv.lancets.map((l) => l.d),
+    ...cv.bays.map((b) => b.arch),
   ])
   const to = sample(arch.targets)
   // pair them roughly left-to-right so the flow has a direction, not a scramble
@@ -281,6 +304,8 @@ function buildFragments() {
       // outer parts of the window go first
       delay: (1 - Math.min(1, f.r / 260)) * 0.45 + rnd() * 0.15,
       spin: (rnd() - 0.5) * 2.5,
+      // a piece of line has no direction: turn the short way (at most a quarter turn)
+      turn: ((((t.a - f.a) % Math.PI) + Math.PI * 1.5) % Math.PI) - Math.PI / 2,
     }
   })
   const path = el('path', { class: 'ink fine fragments' }, svg)
@@ -289,16 +314,16 @@ function buildFragments() {
   function update(P: number): void {
     const u = ramp(P, FRAG_START, FRAG_END)
     if (u <= 0 || u >= 1) {
-      path.style.visibility = 'hidden'
+      setShow(path, 0)
       return
     }
-    path.style.visibility = ''
-    // the last stretch hands over to the drawn arches
-    path.style.opacity = String(1 - ramp(P, FRAG_END - 0.02, FRAG_END))
+    // the lines loosen into pieces (cross-fading with the solid drawing),
+    // and the last stretch hands over to the drawn arches
+    setShow(path, ramp(P, FRAG_START, FRAG_START + 0.012) * (1 - ramp(P, FRAG_END - 0.02, FRAG_END)))
     let d = ''
     for (const pc of pieces) {
-      const loose = ease(ramp(u, pc.delay * 0.6, pc.delay * 0.6 + 0.12))
-      const go = ease(ramp(u, pc.delay, pc.delay + 0.4))
+      const loose = ease5(ramp(u, pc.delay * 0.6, pc.delay * 0.6 + 0.12))
+      const go = ease5(ramp(u, pc.delay, pc.delay + 0.4))
       // quadratic Bézier from source to target via the control point
       const a = 1 - go
       let x = a * a * pc.f.x + 2 * a * go * pc.cx + go * go * pc.t.x
@@ -306,7 +331,7 @@ function buildFragments() {
       const drift = loose * (1 - go)
       x += pc.dx * drift
       y += pc.dy * drift
-      const ang = lerp(pc.f.a, pc.t.a, go) + pc.spin * Math.sin(Math.PI * go)
+      const ang = pc.f.a + pc.turn * go + pc.spin * Math.sin(Math.PI * go)
       const ex = Math.cos(ang) * LEN * 0.5
       const ey = Math.sin(ang) * LEN * 0.5
       d += `M${(x - ex).toFixed(2)} ${(y - ey).toFixed(2)}L${(x + ex).toFixed(2)} ${(y + ey).toFixed(2)}`
@@ -364,20 +389,30 @@ function render(P: number): void {
   setOp(setOut, 0.55 * (1 - ramp(p, 0.3, 0.42)))
   roseInk.forEach(({ p: path, r }) => setDraw(path, ease(ramp(p, 0.02 + r * 0.24, 0.1 + r * 0.24))))
   rims.forEach((c, i) => setDraw(c, ease(ramp(p, 0.26 + i * 0.03, 0.36 + i * 0.03))))
+  setDraw(rimJoints, ease(ramp(p, 0.34, 0.46)))
   setOp(stone, ramp(p, 0.3, 0.42))
+  setOp(rimBand, ramp(p, 0.34, 0.46))
 
   // 2. the glass lights up, centre outward
   panes.forEach(({ g, r }) => setOp(g, ease(ramp(p, 0.36 + r * 0.14, 0.42 + r * 0.14))))
-  setOp(glowUse, 0.75 * ramp(p, 0.42, 0.58))
+  setOp(bleed, ramp(p, 0.42, 0.58))
   setOp(halo, ramp(p, 0.45, 0.62))
 
   // 3. the pull-back: arch, string course, claire-voie, wall
   orderInk.forEach((o, i) => setDraw(o, ease(ramp(p, 0.55 + i * 0.025, 0.7 + i * 0.025))))
-  setDraw(capInk, ramp(p, 0.68, 0.74))
+  setOp(bandA, ramp(p, 0.66, 0.76) * dim)
+  setOp(bandB, ramp(p, 0.68, 0.78) * dim)
+  setDraw(jointInk, ease(ramp(p, 0.7, 0.82)))
+  setOp(shaftFill, ramp(p, 0.7, 0.76) * dim)
+  setDraw(capInk, ease(ramp(p, 0.7, 0.82)))
   setDraw(stringLine, ease(ramp(p, 0.62, 0.74)))
+  setDraw(toothLine, ease(ramp(p, 0.68, 0.8)))
   claireInk.forEach(({ p: path, x }) => setDraw(path, ease(ramp(p, 0.66 + x * 0.06, 0.74 + x * 0.06))))
-  setDraw(foilInk, ramp(p, 0.74, 0.8))
+  bayInk.forEach(({ p: path, x }) => setDraw(path, ease(ramp(p, 0.7 + x * 0.06, 0.8 + x * 0.06))))
+  setOp(bayPlates, ramp(p, 0.76, 0.84) * dim)
+  setDraw(foilInk, ramp(p, 0.78, 0.86))
   claireGlass.forEach(({ g, x }) => setOp(g, ease(ramp(p, 0.76 + x * 0.06, 0.82 + x * 0.06)) * dim))
+  oculusGlass.forEach(({ g, x }) => setOp(g, ease(ramp(p, 0.8 + x * 0.06, 0.86 + x * 0.06)) * dim))
   setDraw(wallLines, ease(ramp(p, 0.7, 0.9)))
   shafts.forEach((sh, i) => setOp(sh, ease(ramp(p, 0.8 + i * 0.03, 0.92 + i * 0.03))))
 
@@ -385,12 +420,13 @@ function render(P: number): void {
   // glass, light and wall fade first, leaving the drawing...
   for (const g of [lWall, lShafts]) setOp(g, dim)
   glassAll.style.opacity = String(dim)
-  setOp(glowUse, 0.75 * ramp(p, 0.42, 0.58) * dim)
+  setOp(bleed, ramp(p, 0.42, 0.58) * dim)
   setOp(halo, ramp(p, 0.45, 0.62) * dim)
   setOp(stone, ramp(p, 0.3, 0.42) * dim)
+  setOp(rimBand, ramp(p, 0.34, 0.46) * dim)
   // ...then the fragments take over the lines exactly where they lie
-  const broken = P >= FRAG_START
-  for (const g of [lRose, lFrame, lClaire]) g.style.visibility = broken ? 'hidden' : ''
+  const solid = 1 - ramp(P, FRAG_START, FRAG_START + 0.012)
+  for (const g of [lRose, lFrame, lClaire]) setShow(g, solid)
   fragments.update(P)
 
   // ---- scene 2 -------------------------------------------------------------
@@ -403,21 +439,38 @@ function render(P: number): void {
   showPanel(panel2, ramp(q, 0.86, 0.93))
 }
 
-// ---- scroll: eased toward the target so wheel steps glide ------------------------
+// ---- scroll: a critically damped spring toward the scroll position -----------------
+// (time-based, so it feels the same at 60 or 144 Hz, and a run of wheel clicks
+// flows into one glide instead of a series of jerks)
 let target = 0
 let current = 0
+const vel = { v: 0 }
+let last = performance.now()
+let drawn_ = -1
+let drawnW = 0
+let drawnH = 0
 const readScroll = () => {
   const max = document.documentElement.scrollHeight - innerHeight
   target = max > 0 ? scrollY / max : 0
 }
 addEventListener('scroll', readScroll, { passive: true })
-addEventListener('resize', () => { readScroll(); render(current) })
+addEventListener('resize', readScroll)
 readScroll()
 current = target
-const tick = () => {
-  current += (target - current) * 0.12
-  if (Math.abs(target - current) < 1e-5) current = target
-  render(current)
+const tick = (now: number) => {
+  const dt = Math.min(0.05, (now - last) / 1000)
+  last = now
+  if (current !== target) {
+    current = smoothDamp(vel, current, target, 0.32, dt)
+    if (Math.abs(target - current) < 2e-6 && Math.abs(vel.v) < 1e-4) { current = target; vel.v = 0 }
+  }
+  // nothing moved: leave the frame as it is
+  if (current !== drawn_ || innerWidth !== drawnW || innerHeight !== drawnH) {
+    drawn_ = current
+    drawnW = innerWidth
+    drawnH = innerHeight
+    render(current)
+  }
   requestAnimationFrame(tick)
 }
 render(current)

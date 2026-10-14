@@ -49,6 +49,10 @@ body {
   stroke-width: calc(var(--px) * 0.7px);
   stroke-opacity: 0.12;
 }
+.ink.faint2 {
+  stroke-width: calc(var(--px) * 0.8px);
+  stroke-opacity: 0.32;
+}
 .ink.guide {
   stroke: var(--guide);
   stroke-width: calc(var(--px) * 0.8px);
@@ -93,6 +97,12 @@ body {
 
 .stone {
   fill: var(--stone);
+}
+.stone.a {
+  fill: #221c16;
+}
+.stone.b {
+  fill: #19140f;
 }
 
 .shafts {

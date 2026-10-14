@@ -1,4 +1,4 @@
-import { ease, el, ramp, setDraw, setOp } from './dom'
+import { drawn, ease, el, ramp, setDraw, setOp } from './dom'
 import { multifoil } from './rose'
 
 /**
@@ -64,8 +64,9 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     `M${P(x - r, y)}a${S(r)} ${S(r)} 0 1 0 ${S(2 * r)} 0a${S(r)} ${S(r)} 0 1 0 ${S(-2 * r)} 0`
 
   const g = el('g', { class: 'layer arch-scene' }, parent)
+  const gWall = el('g', { mask: 'url(#arch-wall-mask)' }, g)
   const gStone = el('g', {}, g)
-  const gGlow = el('g', { opacity: 0, filter: 'url(#glow)' }, g)
+  const gGlow = el('g', { opacity: 0, fill: 'none', 'stroke-linejoin': 'round' }, g)
   const gGlass = el('g', {}, g)
   const gInk = el('g', {}, g)
   const gForce = el('g', {}, g)
@@ -115,15 +116,197 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
   const armL = el('path', { class: 'ink guide', opacity: 0 }, gInk)
   const arm = (cx: number, a: number) => `M${P(cx, 0)}L${P(cx + Math.cos(a) * R, Math.sin(a) * R)}`
 
-  // ---- 2. stone -----------------------------------------------------------------
-  const pierFill = (c: number, half: number) =>
-    `M${P(c - half - T, 0)}H${X(c - half)}V${Y(PIER_FOOT)}H${X(c - half - T)}Z` +
-    `M${P(c + half, 0)}H${X(c + half + T)}V${Y(PIER_FOOT)}H${X(c + half)}Z`
-  const stone = el('path', {
-    d: `${outlines[1][0]}L${P(-50, 0)}${arc(R, 1, 0, -APEX)}${arc(R, 1, 50, 0)}Z` + pierFill(0, 50) +
-      `${outlines[4][0]}L${P(ox - r0, 0)}${arc(r0, 1, ox + r0, 0)}Z` + pierFill(ox, r0),
-    class: 'stone', opacity: 0,
-  }, gStone)
+  // ---- 2. stone: voussoirs and coursed piers, in two alternating tones -----------------
+  const COURSE = PIER_FOOT / 10
+  const stoneA = el('path', { class: 'stone a' }, gStone)
+  const stoneB = el('path', { class: 'stone b' }, gStone)
+  const stoneBase = el('path', { class: 'stone' }, gStone)
+  // the ring between intrados and extrados, as separate wedges
+  const wedge = (cx: number, side: 1 | -1, rIn: number, rOut: number, a0: number, a1: number, a1Out = a1) => {
+    const pos = (rho: number, a: number) => P(cx + side * (rho * Math.cos(a) - (cx === 0 ? 50 : 0)), rho * Math.sin(a))
+    const fwd = side === 1 ? 0 : 1
+    return `M${pos(rIn, a0)}${`A${S(rIn)} ${S(rIn)} 0 0 ${fwd} ${pos(rIn, a1)}`}L${pos(rOut, a1Out)}A${S(rOut)} ${S(rOut)} 0 0 ${1 - fwd} ${pos(rOut, a0)}Z`
+  }
+  let wedgesA = '', wedgesB = ''
+  for (const side of [1, -1] as const) {
+    for (let j = 0; j < 5; j++) {
+      const a0 = (-Math.PI / 3) * (j / 5)
+      const a1 = j === 4 ? -Math.PI / 3 : (-Math.PI / 3) * ((j + 1) / 5)
+      const a1o = j === 4 ? -Math.acos(50 / (R + T)) : a1
+      const w = wedge(0, side, R, R + T, a0, a1, a1o)
+      if (j % 2) wedgesB += w; else wedgesA += w
+    }
+  }
+  for (let j = 0; j < 7; j++) {
+    const w = wedge(ox, 1, r0, r0 + T, (-Math.PI * j) / 7, (-Math.PI * (j + 1)) / 7)
+    if (j % 2) wedgesB += w; else wedgesA += w
+  }
+  // jambs: one stone deep, a course at a time
+  const jambs: [number, number][] = [[-50 - T, 0], [50, 0], [ox - r0 - T, 0], [ox + r0, 0]] // [x, _]
+  let coursesA = '', coursesB = '', coursesBase = ''
+  for (const [jx] of jambs) {
+    for (let i = 0; i < 10; i++) {
+      const r = `M${P(jx, i * COURSE)}H${X(jx + T)}V${Y((i + 1) * COURSE)}H${X(jx)}Z`
+      if (i % 2) coursesB += r; else coursesA += r
+    }
+    coursesBase += `M${P(jx - 3, PIER_FOOT - 13)}H${X(jx + T + 3)}V${Y(PIER_FOOT)}H${X(jx - 3)}Z`
+  }
+  stoneA.setAttribute('d', wedgesA + coursesA)
+  stoneB.setAttribute('d', wedgesB + coursesB)
+  stoneBase.setAttribute('d', coursesBase)
+  const stone = gStone
+  setOp(stone, 0)
+
+  // ---- 2b. the masonry laid out in ink: drawn in after the stone ---------------------
+  const detail = (d: string, cls = 'fine') => drawn(d, cls, gInk)
+  const jambX = (c: number, half: number): [number, number][] => [[c - half - T, 1], [c + half, -1]]
+
+  // coursing in the piers, broken where the shaft stands in front
+  let courseD = ''
+  for (const [c, half] of [[0, 50], [ox, r0]]) {
+    for (const [jx] of jambX(c, half)) {
+      const x0 = jx + T / 2
+      for (let i = 1; i < 10; i++) {
+        const y = i * COURSE
+        if (i === 9) continue // the plinth takes this one
+        courseD += `M${P(jx, y)}H${X(x0 - 3.2)}M${P(x0 + 3.2, y)}H${X(jx + T)}`
+        const jx1 = i % 2 ? jx + T * 0.2 : jx + T * 0.8
+        courseD += `M${P(jx1, y)}V${Y(y + COURSE)}`
+      }
+    }
+  }
+  const courseInk = detail(courseD, 'faint2')
+
+  // voussoir joints and the roll mouldings that run round the ring
+  const ringArc = (rho: number, pointed: boolean) =>
+    pointed
+      ? `M${P(rho - 50, 0)}${arc(rho, 0, 0, -Math.sqrt(rho * rho - 2500))}${arc(rho, 0, 50 - rho, 0)}`
+      : `M${P(ox + rho, 0)}${arc(rho, 0, ox - rho, 0)}`
+  const mouldD =
+    ringArc(R + 6, true) + ringArc(R + 12, true) + ringArc(r0 + 6, false) + ringArc(r0 + 12, false)
+  const mouldInk = detail(mouldD, 'faint2')
+
+  // capitals: foliate bells (with crockets) for the pointed arch, cushions for the round one
+  const crocket = (x: number, y0: number, h: number, dir: 1 | -1) =>
+    `M${P(x, y0)}V${Y(y0 - h + 1.2)}a${S(1.3)} ${S(1.3)} 0 1 ${dir === 1 ? 1 : 0} ${S(dir * 1.3)} ${S(-1.3)}`
+  const gothicCap = (x: number) =>
+    `M${P(x - 5.6, 5)}C${P(x - 5.6, 11)} ${P(x - 3.1, 14)} ${P(x - 3.1, 18)}` +
+    `M${P(x + 5.6, 5)}C${P(x + 5.6, 11)} ${P(x + 3.1, 14)} ${P(x + 3.1, 18)}` +
+    `M${P(x - 3.5, 18)}H${X(x + 3.5)}M${P(x - 3.5, 19.8)}H${X(x + 3.5)}` +
+    crocket(x - 3.6, 16.5, 8, -1) + crocket(x, 17, 9.5, 1) + crocket(x + 3.6, 16.5, 8, 1)
+  const cushionCap = (x: number) =>
+    `M${P(x - 6.8, 5)}V${Y(10)}C${P(x - 6.8, 16)} ${P(x - 4.6, 17.6)} ${P(x - 3.8, 19)}H${X(x + 3.8)}` +
+    `C${P(x + 4.6, 17.6)} ${P(x + 6.8, 16)} ${P(x + 6.8, 10)}V${Y(5)}` +
+    `M${P(x - 6.8, 10)}A${S(3.4)} ${S(3.4)} 0 0 0 ${P(x, 10)}A${S(3.4)} ${S(3.4)} 0 0 0 ${P(x + 6.8, 10)}`
+  let capD = ''
+  for (const [c, half, cap] of [[0, 50, gothicCap], [ox, r0, cushionCap]] as const) {
+    for (const [jx] of jambX(c, half)) {
+      const x0 = jx + T / 2
+      // impost slab, chamfered, running a little into the opening
+      const x1 = jx === c - half - T ? jx - 4 : jx - 4
+      capD += `M${P(x1, 0)}V${Y(5)}H${X(x1 + T + 8)}V${Y(0)}M${P(x1, 2.5)}H${X(x1 + T + 8)}`
+      capD += cap(x0)
+    }
+  }
+  const capInk = detail(capD)
+
+  // shafts, bases and the stylobate they stand on
+  const base = (x: number, w: number) => {
+    const y = PIER_FOOT - 20
+    return (
+      `M${P(x - w, y)}Q${P(x - w - 2.8, y + 0.8)} ${P(x - w - 2.6, y + 3.2)}Q${P(x - w - 2.4, y + 5.4)} ${P(x - w - 0.6, y + 5.4)}` +
+      `H${X(x + w + 0.6)}Q${P(x + w + 2.4, y + 5.4)} ${P(x + w + 2.6, y + 3.2)}Q${P(x + w + 2.8, y + 0.8)} ${P(x + w, y)}` +
+      `M${P(x - w - 4.2, y + 5.4)}V${Y(y + 11)}H${X(x + w + 4.2)}V${Y(y + 5.4)}`
+    )
+  }
+  let shaftD = ''
+  for (const [c, half, w] of [[0, 50, 3], [ox, r0, 3.8]] as const) {
+    for (const [jx] of jambX(c, half)) {
+      const x0 = jx + T / 2
+      shaftD += `M${P(x0 - w, 19.8)}V${Y(PIER_FOOT - 20)}M${P(x0 + w, 19.8)}V${Y(PIER_FOOT - 20)}`
+      // drum joints, a third of the way down each course
+      for (let i = 2; i < 9; i += 2) shaftD += `M${P(x0 - w, i * COURSE)}H${X(x0 + w)}`
+      shaftD += base(x0, w)
+    }
+  }
+  const shaftInk = detail(shaftD)
+  const groundD =
+    `M${P(-130, PIER_FOOT)}H${X(ox + 130)}M${P(-138, PIER_FOOT + 7)}H${X(ox + 138)}` +
+    `M${P(-146, PIER_FOOT + 14)}H${X(ox + 146)}`
+  const groundInk = detail(groundD, 'bold')
+
+  // hood moulds: a label with returns and stops over the pointed arch (a crocketed
+  // finial at its crown), a chevron band over the round one
+  const hoodP = (rho: number) =>
+    `M${P(rho - 50, 14)}V${Y(0)}` + arc(rho, 0, 0, -Math.sqrt(rho * rho - 2500)) + arc(rho, 0, 50 - rho, 0) + `V${Y(14)}`
+  const stops = (c: number, a: number, b: number) =>
+    // the returns end in blocks carved with a rosette
+    [1, -1].map((sd) => `M${P(c + sd * a, 14)}H${X(c + sd * b)}`).join('') +
+    [1, -1].map((sd) => dot(c + sd * (a + b) / 2, 7, 2.1)).join('')
+  const crocketOn = (rho: number, a: number, sd: 1 | -1) => {
+    // a hook on the hood's back, curling toward the crown
+    const bx = sd * (-50 + rho * Math.cos(a)), by = rho * Math.sin(a)
+    const nx = sd * Math.cos(a), ny = Math.sin(a) // outward
+    const tx = sd * Math.sin(a), ty = -Math.cos(a) // along the arc, toward the crown
+    const ex = bx + nx * 3.6 + tx * 4.6, ey = by + ny * 3.6 + ty * 4.6
+    return `M${P(bx, by)}Q${P(bx + nx * 7, by + ny * 7)} ${P(ex, ey)}` + dot(ex, ey, 0.9)
+  }
+  const RH = R + T + 9
+  let crockets = ''
+  for (const sd of [1, -1] as const) for (const a of [-0.28, -0.62, -0.95]) crockets += crocketOn(RH, a, sd)
+  const apexH = Math.sqrt(RH * RH - 2500)
+  const finial =
+    `M${P(0, -apexH)}C${P(-5.5, -apexH - 3.5)} ${P(-5.5, -apexH - 10)} ${P(0, -apexH - 15)}C${P(5.5, -apexH - 10)} ${P(5.5, -apexH - 3.5)} ${P(0, -apexH)}Z` +
+    `M${P(0, -apexH - 3)}V${Y(-apexH - 11)}`
+  const hoodRing = (rho: number) => {
+    // chevron: teeth alternate between two radii around the semicircle
+    const n = 16
+    let d = ''
+    for (let k = 0; k <= 2 * n; k++) {
+      const a = (-Math.PI * k) / (2 * n)
+      const rr = rho + (k % 2 ? 6 : 0)
+      d += `${k ? 'L' : 'M'}${P(ox + rr * Math.cos(a), rr * Math.sin(a))}`
+    }
+    return d
+  }
+  const hoodD =
+    hoodP(R + T + 4) + hoodP(RH) + stops(0, 50 + T + 4, 50 + T + 9) +
+    `M${P(ox + r0 + T + 3, 14)}V${Y(0)}${arc(r0 + T + 3, 0, ox - r0 - T - 3, 0)}V${Y(14)}` +
+    `M${P(ox + r0 + T + 9, 14)}V${Y(0)}${arc(r0 + T + 9, 0, ox - r0 - T - 9, 0)}V${Y(14)}` +
+    hoodRing(r0 + T + 3) + stops(ox, r0 + T + 3, r0 + T + 9)
+  const hoodInk = detail(hoodD)
+  const finialInk = detail(crockets + finial)
+
+  // the wall the arches stand in, laid in courses and faded at the edges;
+  // each opening (with its hood) is cut out so the lines stop at the stone
+  const wallClip = el('clipPath', { id: 'arch-wall-clip' }, defs)
+  const sil = (c: number, out: number, rr: number, pointed: boolean) =>
+    `M${P(c - out, PIER_FOOT)}V${Y(14)}H${X(c - rr)}V${Y(0)}` +
+    (pointed ? arc(RH, 1, 0, -apexH) + arc(RH, 1, rr, 0) : arc(rr, 1, c + rr, 0)) +
+    `V${Y(14)}H${X(c + out)}V${Y(PIER_FOOT)}Z`
+  el('path', {
+    d: `M${P(-260, -230)}H${X(ox + 260)}V${Y(PIER_FOOT)}H${X(-260)}Z` + sil(0, 50 + T, RH - R + 50, true) + sil(ox, r0 + T, r0 + T + 9, false),
+    'clip-rule': 'evenodd',
+  }, wallClip)
+  let wallD = ''
+  for (let i = -8; i < 10; i++) {
+    const y = i * COURSE
+    wallD += `M${P(-250, y)}H${X(ox + 250)}`
+    let x = -250 + ((i * 53) % 37)
+    for (let n = 0; x < ox + 250; n++) {
+      wallD += `M${P(x, y)}V${Y(y + COURSE)}`
+      x += 34 + ((i * 7 + n * 13) % 5) * 7
+    }
+  }
+  const wallInk = el('g', { 'clip-path': 'url(#arch-wall-clip)' }, gWall)
+  const wallPath = drawn(wallD, 'faint2', wallInk)
+  const wallFade = el('radialGradient', {
+    id: 'arch-wall-fade', gradientUnits: 'userSpaceOnUse', cx: X(ox / 2), cy: Y(40), r: S(330),
+  }, defs)
+  el('stop', { offset: 0.4, 'stop-color': '#fff' }, wallFade)
+  el('stop', { offset: 1, 'stop-color': '#fff', 'stop-opacity': 0 }, wallFade)
+  const wallMask = el('mask', { id: 'arch-wall-mask', maskUnits: 'userSpaceOnUse', x: X(-300), y: Y(-260), width: S(ox + 600), height: S(600) }, defs)
+  el('rect', { x: X(-300), y: Y(-260), width: S(ox + 600), height: S(600), fill: 'url(#arch-wall-fade)' }, wallMask)
 
   // ---- 3. heights ----------------------------------------------------------------
   const guides = el('path', {
@@ -146,7 +329,7 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
 
   // ---- 4. weight and thrust ---------------------------------------------------------
   const weights = el('path', {
-    d: arrow(0, -APEX_X - 46, 0, -APEX_X - 6) + arrow(ox, -r0 - T - 46, ox, -r0 - T - 6),
+    d: arrow(0, -APEX_X - 60, 0, -APEX_X - 26) + arrow(ox, -r0 - T - 62, ox, -r0 - T - 20),
     class: 'force', opacity: 0,
   }, gForce)
   const thrustPointed = [1, -1].map((s) =>
@@ -156,8 +339,8 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
   const flows = [thrustPointed, thrustRound].map((d) =>
     el('path', { d, class: 'flow', opacity: 0, 'stroke-dasharray': `${S(3)} ${S(4)}` }, gForce))
   const pushes = el('path', {
-    d: arrow(50 + T + 3, -8, 50 + T + 15, -8, 4) + arrow(-50 - T - 3, -8, -50 - T - 15, -8, 4) +
-      arrow(ox + r0 + T + 3, -8, ox + r0 + T + 36, -8, 5) + arrow(ox - r0 - T - 3, -8, ox - r0 - T - 36, -8, 5),
+    d: arrow(50 + T + 12, -8, 50 + T + 22, -8, 4) + arrow(-50 - T - 12, -8, -50 - T - 22, -8, 4) +
+      arrow(ox + r0 + T + 12, -8, ox + r0 + T + 40, -8, 5) + arrow(ox - r0 - T - 12, -8, ox - r0 - T - 36, -8, 5),
     class: 'push', opacity: 0,
   }, gForce)
 
@@ -190,7 +373,10 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     for (let y = top + 40; y < PIER_FOOT; y += 46) bars += `M${P(cx - 60, y)}H${X(cx + 60)}`
     el('path', { d: bars, stroke: GLASS.lead, 'stroke-width': S(1.6), fill: 'none' }, w)
     el('path', { d: opening, fill: 'url(#pane-light)' }, w)
-    el('use', { href: `#${id}-g` }, gGlow)
+    // light spilling out of the window: stacked soft strokes, no blur filter
+    for (const [sw, a] of [[22, 0.04], [13, 0.06], [6, 0.1]]) {
+      el('path', { d: opening, stroke: '#4a66e0', 'stroke-width': S(sw), 'stroke-opacity': a }, gGlow)
+    }
   }
   windowGlass('arch-glass-p', `M${P(-50, PIER_FOOT)}V${Y(0)}${arc(R, 1, 0, -APEX)}${arc(R, 1, 50, 0)}V${Y(PIER_FOOT)}Z`, 0, -APEX)
   windowGlass('arch-glass-r', `M${P(ox - r0, PIER_FOOT)}V${Y(0)}${arc(r0, 1, ox + r0, 0)}V${Y(PIER_FOOT)}Z`, ox, -r0)
@@ -231,6 +417,15 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     // 2. stone
     setOp(jointInk, ramp(q, 0.26, 0.32))
     setOp(stone, ramp(q, 0.26, 0.34))
+    // the masonry draws itself in: courses, mouldings, capitals, shafts, hood, wall
+    setDraw(groundInk, ease(ramp(q, 0.28, 0.36)))
+    setDraw(courseInk, ease(ramp(q, 0.3, 0.4)))
+    setDraw(mouldInk, ease(ramp(q, 0.32, 0.42)))
+    setDraw(capInk, ease(ramp(q, 0.34, 0.43)))
+    setDraw(shaftInk, ease(ramp(q, 0.36, 0.46)))
+    setDraw(hoodInk, ease(ramp(q, 0.38, 0.48)))
+    setDraw(finialInk, ease(ramp(q, 0.44, 0.5)))
+    setDraw(wallPath, ease(ramp(q, 0.4, 0.62)))
     // 3. heights
     setOp(guides, Math.min(ramp(q, 0.34, 0.4), 1 - ramp(q, 0.7, 0.76)))
     names.forEach((l, i) => setOp(l, ramp(q, 0.36 + i * 0.02, 0.4 + i * 0.02)))

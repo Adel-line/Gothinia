@@ -71,15 +71,94 @@ export function archOrder(o: number): string {
 }
 export const ORDERS = [0, 5, 13, 21, 29]
 
-/** Capitals where each order springs: a bell and an abacus. */
-export function capitals(): string {
+/** The stone between two orders of the arch, as one closed horseshoe. */
+export function archBand(o0: number, o1: number): string {
+  const { half, point, footY } = FRAME
+  const geo = (o: number) => {
+    const R = half + point + o
+    return { R, x: half + o, apex: Math.sqrt(R * R - point * point) }
+  }
+  const a = geo(o0), b = geo(o1)
+  return (
+    `M${f(-b.x)} ${f(footY)}L${f(-b.x)} 0A${f(b.R)} ${f(b.R)} 0 0 1 0 ${f(-b.apex)}A${f(b.R)} ${f(b.R)} 0 0 1 ${f(b.x)} 0L${f(b.x)} ${f(footY)}` +
+    `H${f(a.x)}L${f(a.x)} 0A${f(a.R)} ${f(a.R)} 0 0 0 0 ${f(-a.apex)}A${f(a.R)} ${f(a.R)} 0 0 0 ${f(-a.x)} 0L${f(-a.x)} ${f(footY)}Z`
+  )
+}
+
+/** Voussoir joints through every band of the arch, staggered band to band. */
+export function archJoints(): string {
+  const { half, point } = FRAME
   let d = ''
+  for (let i = 0; i < ORDERS.length - 1; i++) {
+    const o0 = ORDERS[i], o1 = ORDERS[i + 1]
+    const R0 = half + point + o0, R1 = half + point + o1
+    const theta = Math.acos(point / R0) // angle from the springing to the crown, about the arc's centre
+    const n = 10
+    for (let k = 0; k < n; k++) {
+      const t = ((k + (i % 2 ? 0.5 : 0)) / n) * theta
+      if (t <= 0 || t >= theta) continue
+      for (const s of [-1, 1]) {
+        // the arc that springs on this side is struck from the far side of the axis
+        const cx = -s * point
+        const x0 = cx + s * Math.cos(t) * R0, y0 = -Math.sin(t) * R0
+        const x1 = cx + s * Math.cos(t) * R1, y1 = -Math.sin(t) * R1
+        d += `M${f(x0)} ${f(y0)}L${f(x1)} ${f(y1)}`
+      }
+    }
+    // the crown joint
+    const a0 = Math.sqrt(R0 * R0 - point * point), a1 = Math.sqrt(R1 * R1 - point * point)
+    if (i % 2 === 0) d += `M0 ${f(-a0)}L0 ${f(-a1)}`
+  }
+  return d
+}
+
+/**
+ * Nook shafts at each step of the jamb: where an order springs, a shaft with a
+ * foliate bell capital (crockets) and an attic base on a plinth.
+ */
+export function nookShafts(): { fill: string; ink: string } {
+  const { footY } = FRAME
+  let fill = '', ink = ''
+  const sw = 2.3
+  const crocket = (x: number, y0: number, h: number, dir: 1 | -1) =>
+    `M${f(x)} ${f(y0)}V${f(y0 - h + 0.9)}a0.95 0.95 0 1 ${dir === 1 ? 1 : 0} ${f(dir * 0.95)} -0.95`
   for (const s of [-1, 1]) {
     for (const o of [5, 13, 21]) {
       const x = s * (FRAME.half + o)
-      d += `M${f(x - 3.4)} -1.6h6.8v1.6h-6.8Z` // abacus
-      d += `M${f(x - 2.6)} 0L${f(x - 1.4)} 5.4h2.8L${f(x + 2.6)} 0` // bell
+      const yTop = 5.2, yBase = footY - 9
+      fill += `M${f(x - sw)} ${f(yTop)}H${f(x + sw)}V${f(yBase)}H${f(x - sw)}Z`
+      ink += `M${f(x - sw)} ${f(yTop + 7)}V${f(yBase)}M${f(x + sw)} ${f(yTop + 7)}V${f(yBase)}`
+      // abacus, bell, astragal, and three crockets
+      ink += `M${f(x - 3.7)} 0h7.4v2.4h-7.4Z`
+      ink += `M${f(x - 3)} 2.4C${f(x - 3)} 5.8 ${f(x - sw)} 7 ${f(x - sw)} 8.6M${f(x + 3)} 2.4C${f(x + 3)} 5.8 ${f(x + sw)} 7 ${f(x + sw)} 8.6`
+      ink += `M${f(x - 2.7)} 8.6h5.4M${f(x - 2.7)} 9.8h5.4`
+      ink += crocket(x - 1.7, 8.2, 4.4, -1) + crocket(x, 8.4, 5.2, 1) + crocket(x + 1.7, 8.2, 4.4, 1)
+      // drum joints
+      for (let y = yTop + 38; y < yBase - 6; y += 38) ink += `M${f(x - sw)} ${f(y)}H${f(x + sw)}`
+      // attic base on a plinth
+      ink += `M${f(x - sw)} ${f(yBase)}q-1.4 0.3 -1.4 1.6t1.4 1.9h${f(2 * sw)}q1.4 -0.3 1.4 -1.9t-1.4 -1.6`
+      ink += `M${f(x - 4.4)} ${f(yBase + 3.5)}v3.5h8.8v-3.5`
     }
+  }
+  return { fill, ink }
+}
+
+/** A dogtooth band along the string course. */
+export function dogtooth(span: number): string {
+  const { stringTop: t, stringBottom: b } = FRAME
+  const y0 = t + 2.4, step = 4.4
+  let d = `M${-span} ${f(b)}`
+  for (let x = -span; x < span; x += step) d += `L${f(x + step / 2)} ${f(y0 + 0.5)}L${f(x + step)} ${f(b)}`
+  return d
+}
+
+/** Voussoirs round the rose: a ring of radial joints between the plate and the reveal. */
+export function roseJoints(): string {
+  let d = ''
+  const n = 48
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + Math.PI / n
+    d += `M${f(Math.cos(a) * PLATE_R)} ${f(Math.sin(a) * PLATE_R)}L${f(Math.cos(a) * REVEAL_R)} ${f(Math.sin(a) * REVEAL_R)}`
   }
   return d
 }
@@ -119,7 +198,22 @@ export interface Lancet {
   springY: number
 }
 
-export function claireVoie(): { lancets: Lancet[]; foils: string } {
+export interface Bay {
+  /** the arch that holds a pair of lancets, down to the sill */
+  arch: string
+  /** the stone plate in its head: arch head minus the lancet heads and the oculus (even-odd) */
+  plate: string
+  /** the pierced oculus */
+  oculus: string
+  /** its glass: a lobed light */
+  foil: string
+  cx: number
+  cy: number
+  /** 0..1 across the row, for staggering */
+  x: number
+}
+
+export function claireVoie(): { lancets: Lancet[]; bays: Bay[] } {
   const bays = 8
   const span = 2 * FRAME.half
   const bay = span / bays
@@ -130,7 +224,9 @@ export function claireVoie(): { lancets: Lancet[]; foils: string } {
   const apexY = top + 1.15 * W
   const footY = top + 4.88 * W
   const lancets: Lancet[] = []
-  let foils = ''
+  const out: Bay[] = []
+  const head = (cx: number, ww: number, ay: number, sy: number) =>
+    `M${f(cx - ww / 2)} ${f(sy)}A${f(ww)} ${f(ww)} 0 0 1 ${f(cx)} ${f(ay)}A${f(ww)} ${f(ww)} 0 0 1 ${f(cx + ww / 2)} ${f(sy)}Z`
   for (let b = 0; b < bays; b++) {
     const x0 = -FRAME.half + b * bay + major / 2
     const c1 = x0 + w / 2
@@ -139,9 +235,23 @@ export function claireVoie(): { lancets: Lancet[]; foils: string } {
     for (const c of [c1, c2]) {
       lancets.push({ d: lancet(c, w, apexY, footY), x: (c + FRAME.half) / span, cx: c, w, springY })
     }
-    foils += quatrefoil((c1 + c2) / 2, top + 0.6 * W, 0.12 * W)
+    // one arch over the pair, its head pierced by an oculus
+    const m = 1.5
+    const xl = c1 - w / 2 - m, xr = c2 + w / 2 + m, ww = xr - xl, mid = (xl + xr) / 2
+    const apex = springY - ww * Math.sin(Math.PI / 3)
+    const oy = apex + (apexY - apex) * 0.62
+    const or = 3.6
+    const arch = `M${f(xl)} ${f(footY)}V${f(springY)}A${f(ww)} ${f(ww)} 0 0 1 ${f(mid)} ${f(apex)}A${f(ww)} ${f(ww)} 0 0 1 ${f(xr)} ${f(springY)}V${f(footY)}`
+    const oculus = `M${f(mid - or)} ${f(oy)}a${f(or)} ${f(or)} 0 1 0 ${f(2 * or)} 0a${f(or)} ${f(or)} 0 1 0 ${f(-2 * or)} 0Z`
+    out.push({
+      arch,
+      plate: head(mid, ww, apex, springY) + head(c1, w, apexY, springY) + head(c2, w, apexY, springY) + oculus,
+      oculus,
+      foil: quatrefoil(mid, oy, or * 0.86),
+      cx: mid, cy: oy, x: (mid + FRAME.half) / span,
+    })
   }
-  return { lancets, foils }
+  return { lancets, bays: out }
 }
 
 /** Ashlar courses on the wall either side of the frame (+ a few joints). */
