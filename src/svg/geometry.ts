@@ -1,46 +1,30 @@
-import traced from '../scenes/roseWindow/roseTracery.json'
+import { buildRose } from './rose'
 
 /**
  * Geometry for the drawn rose window, in SVG units: origin at the rose's
  * centre, +y DOWN, 100 units = the edge of the glazing.
  *
- * The rose's openings are the real ones, traced from a photograph of the
- * south rose of Notre-Dame (tools/trace_rose.py). Everything around it —
- * arch, string course, claire-voie, wall — is drawn with compass and rule
- * the way a mason would set it out.
+ * Everything — the rose (rose.ts, after the south rose of Notre-Dame), the
+ * arch, string course, claire-voie and wall — is set out with compass and
+ * rule the way a mason would, so every line is a true arc or straight.
  */
 
-export const U = 100 // svg units per traced unit
+export const U = 100 // svg units: 100 = the edge of the glazing
 const W = U / 4.5 // svg units per world unit of the 3D version's frame
 
 export interface Opening {
   d: string
   /** distance of the opening's centre from the rose's centre, 0..1 */
   r: number
-  theta: number
   /** which ring it belongs to: 0 oculus … 5 outer trefoils */
   ring: number
 }
 
-function ringOf(r: number): number {
-  if (r < 0.1) return 0
-  if (r < 0.45) return 1
-  if (r < 0.65) return 2
-  if (r < 0.76) return 3
-  if (r < 0.86) return 4
-  return 5
-}
-
 const f = (v: number) => v.toFixed(2)
 
-export const roseOpenings: Opening[] = traced.openings.map((o) => {
-  const p = o.points
-  let d = `M${f(p[0] * U)} ${f(-p[1] * U)}`
-  for (let i = 2; i < p.length; i += 2) d += `L${f(p[i] * U)} ${f(-p[i + 1] * U)}`
-  return { d: d + 'Z', r: o.r, theta: o.theta, ring: ringOf(o.r) }
-})
+export const roseOpenings: Opening[] = buildRose().map(({ d, r, ring }) => ({ d, r, ring }))
 
-export const PLATE_R = traced.plateRadius * U // 109
+export const PLATE_R = 1.09 * U // the plate runs out to the rim rolls
 export const REVEAL_R = 5.56 * W // the circular reveal in the wall, ~124
 
 /** Stone plate: a disc with every opening cut out (fill-rule evenodd). */
@@ -55,11 +39,12 @@ export function circle(r: number): string {
 
 /** The mason's setting-out: concentric rings and the twelve radii. */
 export const construction = {
-  rings: [0.12, 0.42, 0.66, 0.78, 0.9, 1.0].map((r) => r * U),
+  rings: [0.135, 0.435, 0.665, 0.755, 0.894, 1.0].map((r) => r * U),
   radii: Array.from({ length: 24 }, (_, i) => {
-    const a = (i / 24) * Math.PI * 2 + Math.PI / 24
+    // the bars: every 30° from the oculus, every 15° beyond the first ring
+    const a = (i / 24) * Math.PI * 2
     const long = i % 2 === 0
-    const r0 = (long ? 0.12 : 0.42) * U
+    const r0 = (long ? 0.135 : 0.435) * U
     const r1 = 1.0 * U
     return `M${f(Math.cos(a) * r0)} ${f(Math.sin(a) * r0)}L${f(Math.cos(a) * r1)} ${f(Math.sin(a) * r1)}`
   }),
