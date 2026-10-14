@@ -20,7 +20,7 @@ body {
 
 /* the scroll runway; the drawing is fixed behind it */
 .runway {
-  height: 1800vh;
+  height: 2000vh;
 }
 
 .stage {

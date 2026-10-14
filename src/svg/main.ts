@@ -27,19 +27,23 @@ import { ROUND_X, buildArchScene } from './archScene'
  * reveal the arch, the string course and the claire-voie, each layer moving at
  * its own rate so the flat drawing reads with depth.
  *
- * Transition: the camera dives into the head of one lancet of the
- * claire-voie, while the rest of the window falls away.
+ * Transition: the glass dims, then every line of the window breaks into
+ * fragments that drift and reform as the two arches of scene 2.
  *
- * Scene 2, the pointed arch (archScene.ts), is drawn inside that lancet head.
+ * Scene 2, the pointed arch (archScene.ts), ends with its windows glazed.
  *
  * Everything is a pure function of scroll progress, so scrolling back up
  * reverses it.
  */
 
 // global progress: scene 1 runs 0 → 0.46 (its own timeline is P / 0.46),
-// its text holds to 0.5, the dive runs 0.5 → 0.62, scene 2 runs 0.6 → 1
+// its text holds to 0.5; the lines break up and reform 0.535 → 0.67;
+// scene 2 runs 0.68 → 1
 const S1 = 0.46
-const S2_START = 0.6
+const S2_START = 0.68
+// the rose's lines break apart and reform as the arches between these
+const FRAG_START = 0.535
+const FRAG_END = 0.67
 
 // ---- palette: deep pot-metal glass; stone is ink on dark ---------------------
 const GLASS = {
@@ -152,22 +156,20 @@ const claireGlass = cv.lancets.map((l, i) => {
   return { g, x: l.x }
 })
 const claireInk = cv.lancets.map((l) => ({ p: drawn(l.d, 'fine', lClaire), x: l.x }))
-// the lancet the camera dives into: lifted out of the row so it can stay
-// while the rest of the window falls away
-const PICK = cv.lancets.findIndex((l) => l.cx > 0)
-const lPick = el('g', {}, svg)
-lPick.appendChild(claireGlass[PICK].g)
-lPick.appendChild(claireInk[PICK].p)
+
 const foilInk = drawn(cv.foils, 'fine', lClaire)
 
 // frame: arch orders and capitals
 const orderInk = ORDERS.map((o) => drawn(archOrder(o), o === 0 ? 'bold' : 'fine', lFrame))
 const capInk = drawn(capitals(), 'fine', lFrame)
 
-// ---- scene 2: the pointed arch, inside the picked lancet's head ---------------------
-const pick = cv.lancets[PICK]
-const ARCH = { x: pick.cx, y: pick.springY, k: pick.w / 100 }
-const arch = buildArchScene(svg, ARCH)
+// ---- scene 2: the pointed arch, where the rose stood ------------------------------
+// the pair of arches (local x −68 … ROUND_X + 68, y −150 … 250) is centred
+// on the rose's place in the drawing, at about the rose's size
+const AK = 0.8
+const ARCH = { x: -(ROUND_X / 2) * AK, y: 34 - 50 * AK, k: AK }
+const arch = buildArchScene(svg, defs, ARCH)
+const fragments = buildFragments()
 /** a camera shot framing a box given in the arch's local units */
 const archShot = (x0: number, y0: number, x1: number, y1: number): Shot => ({
   cx: ARCH.x + ((x0 + x1) / 2) * ARCH.k,
@@ -176,18 +178,19 @@ const archShot = (x0: number, y0: number, x1: number, y1: number): Shot => ({
   h: (y1 - y0) * ARCH.k,
 })
 const q2 = (q: number) => S2_START + q * (1 - S2_START) // scene-2 local → global
+const WIDE = archShot(-110, -175, ROUND_X + 190, 268)
 const SHOTS2: [number, Shot][] = [
-  // the dive: onto the head of the lancet
-  [0.62, archShot(-70, -120, 70, 40)],
-  // the compass work, then the whole arch on its piers
-  [q2(0.16), archShot(-80, -125, 80, 45)],
-  [q2(0.3), archShot(-110, -140, 110, 250)],
-  // widen to bring in the round arch beside it
-  [q2(0.42), archShot(-110, -150, ROUND_X + 160, 262)],
-  [q2(0.8), archShot(-110, -170, ROUND_X + 160, 262)],
+  // the text goes, the camera centres on where the arches will stand
+  [0.56, WIDE],
+  [q2(0.04), WIDE],
+  // close on the pointed arch for the compass work, then back out
+  [q2(0.09), archShot(-95, -125, 95, 45)],
+  [q2(0.21), archShot(-95, -125, 95, 45)],
+  [q2(0.3), WIDE],
+  [q2(0.86), WIDE],
   // make room for the text on the left
-  [q2(0.88), archShot(-330, -170, ROUND_X + 140, 262)],
-  [1.0, archShot(-330, -170, ROUND_X + 140, 262)],
+  [q2(0.93), archShot(-380, -175, ROUND_X + 170, 268)],
+  [1.0, archShot(-380, -175, ROUND_X + 170, 268)],
 ]
 
 // ---- camera -----------------------------------------------------------------------
@@ -211,6 +214,106 @@ function camera(p: number): Shot {
   // zoom in log space so the dolly moves at an even pace
   const lw = (x: number, y: number) => Math.exp(lerp(Math.log(x), Math.log(y), t))
   return { cx: lerp(a.cx, b.cx, t), cy: lerp(a.cy, b.cy, t), w: lw(a.w, b.w), h: lw(a.h, b.h) }
+}
+
+
+// ---- fragments: the rose's lines breaking up and reforming -------------------------
+/**
+ * Short pieces of line sampled along every outline of the window, each sent
+ * to a point on the arches' outlines. Each piece first loosens and drifts
+ * (outer parts first), then sweeps along a curve to its new place, turning
+ * to lie along the new line. Drawn as one path, rebuilt each frame only
+ * while the transition is running.
+ */
+function buildFragments() {
+  const N = 1400
+  const LEN = 2.4 // drawing units per piece
+  const sampler = el('path', {}, defs)
+  /** N points spread over the outlines in proportion to their length */
+  function sample(ds: string[]): { x: number; y: number; a: number; r: number }[] {
+    const lens = ds.map((d) => {
+      sampler.setAttribute('d', d)
+      return sampler.getTotalLength()
+    })
+    const total = lens.reduce((a, b) => a + b, 0)
+    const out: { x: number; y: number; a: number; r: number }[] = []
+    let seed = 7
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+    ds.forEach((d, i) => {
+      sampler.setAttribute('d', d)
+      const n = Math.round((lens[i] / total) * N)
+      for (let j = 0; j < n; j++) {
+        const at = ((j + rnd() * 0.8) / n) * lens[i]
+        const p0 = sampler.getPointAtLength(at)
+        const p1 = sampler.getPointAtLength(Math.min(lens[i], at + 0.5))
+        out.push({ x: p0.x, y: p0.y, a: Math.atan2(p1.y - p0.y, p1.x - p0.x), r: Math.hypot(p0.x, p0.y) })
+      }
+    })
+    return out
+  }
+  const from = sample([
+    ...roseOpenings.map((o) => o.d),
+    circle(U), circle(PLATE_R), circle(REVEAL_R),
+    ...ORDERS.map((o) => archOrder(o)),
+    ...cv.lancets.map((l) => l.d),
+  ])
+  const to = sample(arch.targets)
+  // pair them roughly left-to-right so the flow has a direction, not a scramble
+  const byX = (a: { x: number }, b: { x: number }) => a.x - b.x
+  from.sort(byX)
+  to.sort(byX)
+  let seed = 11
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  const pieces = from.map((f, i) => {
+    const t = to[Math.floor((i / from.length) * to.length)]
+    const mx = (f.x + t.x) / 2
+    const my = (f.y + t.y) / 2
+    const bend = (rnd() - 0.5) * 140
+    const d = Math.hypot(t.x - f.x, t.y - f.y) || 1
+    return {
+      f, t,
+      // control point: off to one side of the straight path, lifted a little
+      cx: mx + (-(t.y - f.y) / d) * bend,
+      cy: my + ((t.x - f.x) / d) * bend - 30,
+      // loosening drift
+      dx: (rnd() - 0.5) * 10,
+      dy: (rnd() - 0.5) * 10 - 4,
+      // outer parts of the window go first
+      delay: (1 - Math.min(1, f.r / 260)) * 0.45 + rnd() * 0.15,
+      spin: (rnd() - 0.5) * 2.5,
+    }
+  })
+  const path = el('path', { class: 'ink fine fragments' }, svg)
+  path.style.visibility = 'hidden'
+
+  function update(P: number): void {
+    const u = ramp(P, FRAG_START, FRAG_END)
+    if (u <= 0 || u >= 1) {
+      path.style.visibility = 'hidden'
+      return
+    }
+    path.style.visibility = ''
+    // the last stretch hands over to the drawn arches
+    path.style.opacity = String(1 - ramp(P, FRAG_END - 0.02, FRAG_END))
+    let d = ''
+    for (const pc of pieces) {
+      const loose = ease(ramp(u, pc.delay * 0.6, pc.delay * 0.6 + 0.12))
+      const go = ease(ramp(u, pc.delay, pc.delay + 0.4))
+      // quadratic Bézier from source to target via the control point
+      const a = 1 - go
+      let x = a * a * pc.f.x + 2 * a * go * pc.cx + go * go * pc.t.x
+      let y = a * a * pc.f.y + 2 * a * go * pc.cy + go * go * pc.t.y
+      const drift = loose * (1 - go)
+      x += pc.dx * drift
+      y += pc.dy * drift
+      const ang = lerp(pc.f.a, pc.t.a, go) + pc.spin * Math.sin(Math.PI * go)
+      const ex = Math.cos(ang) * LEN * 0.5
+      const ey = Math.sin(ang) * LEN * 0.5
+      d += `M${(x - ex).toFixed(2)} ${(y - ey).toFixed(2)}L${(x + ex).toFixed(2)} ${(y + ey).toFixed(2)}`
+    }
+    path.setAttribute('d', d)
+  }
+  return { update }
 }
 
 // ---- overlay ------------------------------------------------------------------------
@@ -237,6 +340,7 @@ function render(P: number): void {
   // camera → viewBox, fitted to the window (contain)
   const s = camera(P)
   const p = Math.min(1, P / S1) // scene 1's own timeline
+  const dim = 1 - ease(ramp(P, 0.5, 0.54)) // the glass dims before the lines break
   const A = innerWidth / innerHeight
   const vw = s.w / s.h > A ? s.w : s.h * A
   const vh = vw / A
@@ -273,21 +377,25 @@ function render(P: number): void {
   setDraw(stringLine, ease(ramp(p, 0.62, 0.74)))
   claireInk.forEach(({ p: path, x }) => setDraw(path, ease(ramp(p, 0.66 + x * 0.06, 0.74 + x * 0.06))))
   setDraw(foilInk, ramp(p, 0.74, 0.8))
-  claireGlass.forEach(({ g, x }) => setOp(g, ease(ramp(p, 0.76 + x * 0.06, 0.82 + x * 0.06))))
+  claireGlass.forEach(({ g, x }) => setOp(g, ease(ramp(p, 0.76 + x * 0.06, 0.82 + x * 0.06)) * dim))
   setDraw(wallLines, ease(ramp(p, 0.7, 0.9)))
   shafts.forEach((sh, i) => setOp(sh, ease(ramp(p, 0.8 + i * 0.03, 0.92 + i * 0.03))))
 
-  // ---- transition: the window falls away round the picked lancet ----------
-  const away = 1 - ease(ramp(P, 0.52, 0.6))
-  for (const g of [lWall, lShafts, lRose, lFrame]) setOp(g, away)
-  setOp(lClaire, 1 - ease(ramp(P, 0.55, 0.61)))
-  // the lancet's own glass goes; its outline hands over to the arch
-  setOp(claireGlass[PICK].g, Math.min(ease(ramp(p, 0.76 + pick.x * 0.06, 0.82 + pick.x * 0.06)), 1 - ramp(P, 0.6, 0.64)))
-  setOp(claireInk[PICK].p, 1 - ramp(P, 0.66, 0.7))
+  // ---- transition: the glass dims, the lines break up and reform -----------
+  // glass, light and wall fade first, leaving the drawing...
+  for (const g of [lWall, lShafts]) setOp(g, dim)
+  glassAll.style.opacity = String(dim)
+  setOp(glowUse, 0.75 * ramp(p, 0.42, 0.58) * dim)
+  setOp(halo, ramp(p, 0.45, 0.62) * dim)
+  setOp(stone, ramp(p, 0.3, 0.42) * dim)
+  // ...then the fragments take over the lines exactly where they lie
+  const broken = P >= FRAG_START
+  for (const g of [lRose, lFrame, lClaire]) g.style.visibility = broken ? 'hidden' : ''
+  fragments.update(P)
 
   // ---- scene 2 -------------------------------------------------------------
   const q = ramp(P, S2_START, 1)
-  arch.update(q, ramp(P, 0.58, 0.61), P * 900)
+  arch.update(q, ramp(P, FRAG_END - 0.02, FRAG_END + 0.01), P * 900)
 
   // overlay
   intro.style.opacity = String(1 - ramp(p, 0.01, 0.05))
