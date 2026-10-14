@@ -15,34 +15,36 @@ export interface SectionContent {
 export const sections: SectionContent[] = [
   {
     id: 'rose-window',
-    kicker: 'Sainte-Chapelle · Paris · Rayonnant',
+    kicker: 'Notre-Dame de Paris · South rose · c. 1260',
     title: 'The Rose Window',
     body:
-      'In the Rayonnant style, stone was pared down to a skeletal framework of ' +
-      'mullions radiating from a central oculus — the wall itself became glass. ' +
-      'The western rose of Sainte-Chapelle, rebuilt around 1485, turns fifteen ' +
-      'metres of masonry into a wheel of light: slender spokes brace rings of ' +
-      'cusped lights, and each opening is glazed in deep cobalt and ruby so the ' +
-      'chapel interior reads as a reliquary lit from within.',
+      'Around 1260 the masons of Notre-Dame stopped treating the wall as ' +
+      'something to pierce and began treating it as a frame for light. The ' +
+      'south rose is nearly thirteen metres across, yet its stone is pared ' +
+      'down to a net of slender bars: twelve lights around the centre, ' +
+      'doubling to twenty-four, ring after ring held between them. Through ' +
+      'it comes a light that is almost all cobalt and ruby — saints and ' +
+      'apostles circling the centre, glass that has been lost, restored and ' +
+      'reset for more than seven centuries.',
     calloutLabels: [
       'Central oculus',
       'Radiating mullions',
-      'Cusped trefoil light',
-      'Stained-glass pane',
+      'Foiled outer light',
+      'Medallion light',
     ],
   },
   {
     id: 'pointed-arch',
-    kicker: 'Duomo di Milano · Milan · Lombard Gothic',
+    kicker: 'Gothic structure · from c. 1140',
     title: 'The Pointed Arch',
     body:
-      'The pointed arch is two circular arcs leaning together, and that break ' +
-      'at the crown changes everything: thrust that a round arch spreads ' +
-      'sideways is steered steeply down into the piers, so walls could rise ' +
-      'far higher on far less stone. In Milan the arcade pushes the idea to ' +
-      'its limit — clustered piers as tall as a six-storey building carry ' +
-      'tier upon tier of arches, and daylight enters only high above, ' +
-      'through the glazed lancets of the clerestory.',
+      'Every lancet under the rose ends in the same figure: two arcs, each ' +
+      'struck from the opposite side, leaning together at the top. A round ' +
+      'arch can only rise half as high as it is wide, and its weight pushes ' +
+      'outward, trying to spread its walls apart. Break it at the crown and ' +
+      'the arch climbs higher on the same span, and its weight turns ' +
+      'downward, into the piers. That small change let builders reach ' +
+      'heights that had once seemed impossible.',
     calloutLabels: [
       'Two-centred apex',
       'Clustered pier',

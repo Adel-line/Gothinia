@@ -1,0 +1,169 @@
+:root {
+  --bg: #0d0b09;
+  --ink: #d9ccb2;
+  --guide: #8f7d5d;
+  --stone: #1e1914;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  overflow-x: hidden;
+}
+
+/* the scroll runway; the drawing is fixed behind it */
+.runway {
+  height: 2000vh;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  /* one screen pixel in drawing units, set every frame */
+  --px: 1;
+}
+
+.ink {
+  fill: none;
+  stroke: var(--ink);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ink.fine {
+  stroke-width: calc(var(--px) * 1.1px);
+}
+.ink.bold {
+  stroke-width: calc(var(--px) * 1.8px);
+}
+.ink.faint {
+  stroke-width: calc(var(--px) * 0.7px);
+  stroke-opacity: 0.12;
+}
+.ink.faint2 {
+  stroke-width: calc(var(--px) * 0.8px);
+  stroke-opacity: 0.32;
+}
+.ink.guide {
+  stroke: var(--guide);
+  stroke-width: calc(var(--px) * 0.8px);
+}
+
+.ink.dashed {
+  stroke-dasharray: calc(var(--px) * 3px) calc(var(--px) * 4px);
+}
+.dot {
+  fill: var(--ink);
+}
+.force,
+.flow,
+.push {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.force {
+  stroke: var(--ink);
+  stroke-width: calc(var(--px) * 1.4px);
+}
+.flow {
+  stroke: #e0a53a;
+  stroke-width: calc(var(--px) * 2.2px);
+}
+.push {
+  stroke: #d0434f;
+  stroke-width: calc(var(--px) * 1.8px);
+}
+.label {
+  fill: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.08em;
+}
+.label.side {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-style: italic;
+  letter-spacing: 0;
+  fill: var(--guide);
+}
+
+.stone {
+  fill: var(--stone);
+}
+.stone.a {
+  fill: #221c16;
+}
+.stone.b {
+  fill: #19140f;
+}
+
+.shafts {
+  mix-blend-mode: screen;
+}
+
+/* ---------- overlay ---------- */
+#overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.kicker {
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: #b8a468;
+}
+
+.intro {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 9vh;
+  text-align: center;
+}
+.intro .cue {
+  margin-top: 12px;
+  font-style: italic;
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+.panel {
+  position: absolute;
+  left: clamp(16px, 5vw, 80px);
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: min(380px, calc(100vw - 32px));
+  padding: 28px 30px;
+  background: rgba(13, 11, 9, 0.78);
+  border-left: 1px solid rgba(217, 204, 178, 0.3);
+  opacity: 0;
+}
+.panel h2 {
+  font-weight: 400;
+  font-size: 32px;
+  margin: 12px 0 14px;
+}
+.panel p {
+  font-size: 15.5px;
+  line-height: 1.65;
+  opacity: 0.88;
+}
+
+@media (max-width: 700px) {
+  .panel {
+    top: auto;
+    bottom: 16px;
+    transform: none;
+  }
+}

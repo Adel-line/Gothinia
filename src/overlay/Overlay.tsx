@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useMotionValue } from 'framer-motion'
 import { scenes } from '../scenes/registry'
-import { overlayOpacity, ramp, scenePhase, scrollState } from '../scroll/scrollState'
+import { overlayOpacity, scenePhase, scrollState } from '../scroll/scrollState'
 import { applyPose } from '../three/cameraMath'
 import { TextPanel } from './TextPanel'
 import { Callouts, type CalloutHandles } from './Callouts'
@@ -17,7 +17,6 @@ export function Overlay() {
   const [active, setActive] = useState(0)
   const activeRef = useRef(0)
   const handles = useRef<CalloutHandles>({ chips: [], lines: [], dots: [] })
-  const cueRef = useRef<HTMLDivElement>(null)
   const hudRef = useRef<HTMLDivElement>(null)
 
   const panelOpacity = useMotionValue(0)
@@ -77,9 +76,6 @@ export function Overlay() {
         dot.style.opacity = String(alpha)
       })
 
-      if (cueRef.current) {
-        cueRef.current.style.opacity = String(1 - ramp(scrollState.progress, 0.005, 0.04))
-      }
       if (hudRef.current) {
         hudRef.current.textContent = `p ${scrollState.progress.toFixed(3)}  scene ${clamped}  t ${t.toFixed(3)}`
       }
@@ -94,10 +90,6 @@ export function Overlay() {
     <div className="overlay">
       <TextPanel content={def.content} opacity={panelOpacity} y={panelY} />
       <Callouts key={def.content.id} callouts={def.callouts} handles={handles} />
-      <div ref={cueRef} className="scroll-cue">
-        <span>Scroll</span>
-        <div className="scroll-cue-line" />
-      </div>
       {debug && <div ref={hudRef} className="debug-hud" />}
     </div>
   )

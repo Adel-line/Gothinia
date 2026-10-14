@@ -14,14 +14,17 @@ export const scenes: SceneDef[] = [
   {
     content: sections[0],
     Component: RoseWindow,
-    poseTight: { position: [0, 0, 3.4], lookAt: [0, 0, 0], fov: 36 },
-    poseWide: { position: [1.7, -1.0, 16.6], lookAt: [0, 0, 0], fov: 36 },
+    // close enough to read the glass, not so close the photo's grain shows
+    poseTight: { position: [0, 0, 4.2], lookAt: [0, 0, 0], fov: 36 },
+    // pulled back to show the rose in its frame: the moulded arch above and
+    // the claire-voie below
+    poseWide: { position: [2.4, -2.6, 30.5], lookAt: [0, -2.0, 0], fov: 36 },
     background: '#060403',
     callouts: [
       { label: sections[0].calloutLabels[0], anchor: roseAnchors.oculus, labelOffset: [0.17, 0.2] },
-      { label: sections[0].calloutLabels[1], anchor: roseAnchors.mullion, labelOffset: [0.13, -0.14] },
+      { label: sections[0].calloutLabels[1], anchor: roseAnchors.mullion, labelOffset: [-0.13, -0.16] },
       { label: sections[0].calloutLabels[2], anchor: roseAnchors.trefoil, labelOffset: [-0.1, 0.16] },
-      { label: sections[0].calloutLabels[3], anchor: roseAnchors.pane, labelOffset: [0.12, -0.08] },
+      { label: sections[0].calloutLabels[3], anchor: roseAnchors.pane, labelOffset: [0.17, -0.05] },
     ],
   },
   {

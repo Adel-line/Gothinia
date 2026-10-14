@@ -1,17 +1,15 @@
 import { useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Bloom, EffectComposer, SSAO, Vignette } from '@react-three/postprocessing'
-import { BlendFunction } from 'postprocessing'
+import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import { EdgeBlurEffect } from './effects/EdgeBlur'
 import { scenes } from '../scenes/registry'
-import { edgeBlurStrength, scenePhase, scrollState, swapBlurStrength } from '../scroll/scrollState'
+import { scenePhase, scrollState, swapBlurStrength } from '../scroll/scrollState'
 
 export function Effects() {
   const edgeBlur = useMemo(() => new EdgeBlurEffect(), [])
 
   useFrame(() => {
     const { index, t } = scenePhase(scrollState.progress, scenes.length)
-    edgeBlur.edgeStrength = edgeBlurStrength(t)
     // While the sequence has a single scene, let the final blur-out play as a
     // preview of the swap mechanic (isLast = false); with the full sequence
     // the last scene holds sharp instead.
@@ -20,23 +18,9 @@ export function Effects() {
   })
 
   return (
-    <EffectComposer multisampling={0} enableNormalPass>
-      <SSAO
-        blendFunction={BlendFunction.MULTIPLY}
-        samples={24}
-        rings={4}
-        radius={0.14}
-        intensity={5}
-        bias={0.025}
-        luminanceInfluence={0.6}
-        worldDistanceThreshold={30}
-        worldDistanceFalloff={5}
-        worldProximityThreshold={0.5}
-        worldProximityFalloff={0.2}
-      />
-      <Bloom mipmapBlur luminanceThreshold={0.28} luminanceSmoothing={0.2} intensity={1.2} radius={0.45} />
+    <EffectComposer multisampling={0}>
+      <Bloom mipmapBlur luminanceThreshold={0.6} luminanceSmoothing={0.25} intensity={0.55} radius={0.5} />
       <primitive object={edgeBlur} />
-      <Vignette eskil={false} offset={0.18} darkness={0.68} />
     </EffectComposer>
   )
 }
