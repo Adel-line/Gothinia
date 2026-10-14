@@ -33,6 +33,12 @@ body {
   --px: 1;
 }
 
+/* Glass never uses --px (the hairline scale, set on every frame). Declaring it here
+   keeps the browser from re-resolving styles for every node inside a glass group. */
+.iso {
+  --px: 1;
+}
+
 .ink {
   fill: none;
   stroke: var(--ink);
@@ -110,6 +116,11 @@ body {
 }
 .stone.b {
   fill: #19140f;
+}
+
+.gl-fx {
+  /* set from the camera's motion (glass.ts): grain only while the view is at rest */
+  opacity: var(--fx, 0);
 }
 
 .shafts {

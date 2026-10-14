@@ -14,6 +14,8 @@ const W = U / 4.5 // svg units per world unit of the 3D version's frame
 
 export interface Opening {
   d: string
+  /** the outline sampled as points (metadata for the glass: where each pane sits) */
+  pts: [number, number][]
   /** distance of the opening's centre from the rose's centre, 0..1 */
   r: number
   /** which ring it belongs to: 0 oculus … 5 outer trefoils */
@@ -22,7 +24,7 @@ export interface Opening {
 
 const f = (v: number) => v.toFixed(2)
 
-export const roseOpenings: Opening[] = buildRose().map(({ d, r, ring }) => ({ d, r, ring }))
+export const roseOpenings: Opening[] = buildRose().map(({ d, r, ring, pts }) => ({ d, r, ring, pts }))
 
 export const PLATE_R = 1.09 * U // the plate runs out to the rim rolls
 export const REVEAL_R = 5.56 * W // the circular reveal in the wall, ~124
@@ -205,6 +207,8 @@ export interface Bay {
   plate: string
   /** the pierced oculus */
   oculus: string
+  /** its radius */
+  or: number
   /** its glass: a lobed light */
   foil: string
   cx: number
@@ -247,6 +251,7 @@ export function claireVoie(): { lancets: Lancet[]; bays: Bay[] } {
       arch,
       plate: head(mid, ww, apex, springY) + head(c1, w, apexY, springY) + head(c2, w, apexY, springY) + oculus,
       oculus,
+      or,
       foil: quatrefoil(mid, oy, or * 0.86),
       cx: mid, cy: oy, x: (mid + FRAME.half) / span,
     })

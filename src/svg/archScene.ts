@@ -1,4 +1,6 @@
 import { drawn, ease, el, ramp, setDraw, setOp } from './dom'
+import { GRAIN_FILL, THICK_FILL, glassFill, mosaicFill, pigmentFill } from './glass'
+import type { Family } from './glass'
 import { multifoil } from './rose'
 
 /**
@@ -67,7 +69,7 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
   const gWall = el('g', { mask: 'url(#arch-wall-mask)' }, g)
   const gStone = el('g', {}, g)
   const gGlow = el('g', { opacity: 0, fill: 'none', 'stroke-linejoin': 'round' }, g)
-  const gGlass = el('g', {}, g)
+  const gGlass = el('g', { class: 'iso' }, g)
   const gInk = el('g', {}, g)
   const gForce = el('g', {}, g)
 
@@ -349,37 +351,48 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
   // medallions down the light (a gold ring round ruby, a quatrefoil at the
   // heart), and the iron saddle bars that hold the panels
   const lead = { stroke: GLASS.lead, 'stroke-width': S(0.9) }
-  const windowGlass = (id: string, opening: string, cx: number, top: number) => {
+  const windowGlass = (id: string, opening: string, cx: number, top: number, n: number) => {
     el('clipPath', { id }, defs).appendChild(el('path', { d: opening }))
     const w = el('g', { id: `${id}-g`, 'clip-path': `url(#${id})` }, gGlass)
-    el('path', { d: opening, fill: GLASS.cobalt }, w)
-    el('path', { d: opening, fill: 'url(#quarry)' }, w)
+    const layer = (fill: string, extra: Record<string, string | number> = {}) => el('path', { d: opening, fill, ...extra }, w)
+    // the ground: cobalt, in hand-cut pieces, with the glass's own mottling
+    layer(glassFill(defs, 'blue', n))
+    layer(mosaicFill(defs, 'blue', n * 3, 5.2 * k, true))
+    layer(pigmentFill(n))
     // ruby border band, with a lead came on its inner edge
-    el('path', { d: opening, fill: 'none', stroke: GLASS.lead, 'stroke-width': S(17.8) }, w)
-    el('path', { d: opening, fill: 'none', stroke: GLASS.ruby, 'stroke-width': S(16) }, w)
+    const band = (stroke: string, width: number, extra: Record<string, string | number> = {}) =>
+      layer('none', { stroke, 'stroke-width': S(width), ...extra })
+    band(GLASS.lead, 17.8)
+    band(glassFill(defs, 'ruby', n), 16)
+    band(mosaicFill(defs, 'ruby', n * 3 + 1, 4.2 * k), 16, { 'stroke-opacity': 0.8 })
     const h = PIER_FOOT - top
     const medY = [top + 0.27 * h, top + 0.55 * h, top + 0.83 * h]
+    // a medallion disc: glass of a family, mottled and thickened like any other pane
+    const disc = (d: string, family: Family, v: number, extra: Record<string, string | number> = {}) => {
+      el('path', { d, fill: glassFill(defs, family, v), ...lead, ...extra }, w)
+      el('path', { d, fill: pigmentFill(v + n) }, w)
+      el('path', { d, fill: THICK_FILL }, w)
+    }
     medY.forEach((my, i) => {
-      el('path', { d: dot(cx, my, 31), fill: GLASS.gold, ...lead }, w)
-      el('path', { d: dot(cx, my, 26.5), fill: i === 1 ? GLASS.deep : GLASS.ruby, ...lead }, w)
+      disc(dot(cx, my, 31), 'amber', i)
+      disc(dot(cx, my, 26.5), i === 1 ? 'blue' : 'ruby', i + 1)
       const foil = multifoil([cx, my], 4, 8.5, 9.5, Math.PI / 4)
-      el('path', {
-        d: 'M' + foil.map(([fx, fy]) => P(fx, fy)).join('L') + 'Z',
-        fill: i === 1 ? GLASS.ruby : GLASS.cobalt, ...lead,
-      }, w)
-      el('path', { d: dot(cx, my, 3.2), fill: GLASS.gold, ...lead }, w)
+      disc('M' + foil.map(([fx, fy]) => P(fx, fy)).join('L') + 'Z', i === 1 ? 'ruby' : 'blue', i + 2)
+      disc(dot(cx, my, 3.2), 'amber', i)
     })
     let bars = ''
     for (let y = top + 40; y < PIER_FOOT; y += 46) bars += `M${P(cx - 60, y)}H${X(cx + 60)}`
     el('path', { d: bars, stroke: GLASS.lead, 'stroke-width': S(1.6), fill: 'none' }, w)
-    el('path', { d: opening, fill: 'url(#pane-light)' }, w)
+    layer(THICK_FILL)
+    // bubbles and cloudy streaks, only while the view is at rest
+    el('path', { d: opening, fill: GRAIN_FILL }, el('g', { class: 'gl-fx' }, w))
     // light spilling out of the window: stacked soft strokes, no blur filter
     for (const [sw, a] of [[22, 0.04], [13, 0.06], [6, 0.1]]) {
       el('path', { d: opening, stroke: '#4a66e0', 'stroke-width': S(sw), 'stroke-opacity': a }, gGlow)
     }
   }
-  windowGlass('arch-glass-p', `M${P(-50, PIER_FOOT)}V${Y(0)}${arc(R, 1, 0, -APEX)}${arc(R, 1, 50, 0)}V${Y(PIER_FOOT)}Z`, 0, -APEX)
-  windowGlass('arch-glass-r', `M${P(ox - r0, PIER_FOOT)}V${Y(0)}${arc(r0, 1, ox + r0, 0)}V${Y(PIER_FOOT)}Z`, ox, -r0)
+  windowGlass('arch-glass-p', `M${P(-50, PIER_FOOT)}V${Y(0)}${arc(R, 1, 0, -APEX)}${arc(R, 1, 50, 0)}V${Y(PIER_FOOT)}Z`, 0, -APEX, 1)
+  windowGlass('arch-glass-r', `M${P(ox - r0, PIER_FOOT)}V${Y(0)}${arc(r0, 1, ox + r0, 0)}V${Y(PIER_FOOT)}Z`, ox, -r0, 2)
   // the glass lights from the sill up, like a window catching the sun
   const glassMask = el('mask', { id: 'arch-glass-mask', maskUnits: 'userSpaceOnUse', x: X(-200), y: Y(-250), width: S(700), height: S(600) }, defs)
   const fade = el('linearGradient', { id: 'arch-glass-edge', x1: 0, y1: 0, x2: 0, y2: 1 }, defs)

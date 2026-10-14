@@ -23,6 +23,7 @@ import {
 import { drawn, ease, el, monotone, ramp, setDraw, setOp, setShow, smoothDamp } from './dom'
 import { ROUND_X, buildArchScene } from './archScene'
 import { buildSwarm } from './swarm'
+import { glassPane, glowColour, lancetSpec, rosePaneSpec, paneGeoFromPoints, setFx } from './glass'
 import type { View } from './swarm'
 import { buildVaultScene } from './vaultScene'
 
@@ -59,40 +60,12 @@ const S2_START = 0.68
 const FRAG_START = 0.535
 const FRAG_END = 0.67
 
-// ---- palette: deep pot-metal glass; stone is ink on dark ---------------------
-const GLASS = {
-  cobalt: '#1d3a9e',
-  cobaltDeep: '#132a7a',
-  ruby: '#9c1a24',
-  gold: '#c98a22',
-  emerald: '#1f6b3c',
-  murrey: '#5a2160',
-}
-/** ground + border per ring: blue dominant, ruby to punctuate */
-function paneColours(ring: number, i: number): { ground: string; border: string } {
-  switch (ring) {
-    case 0: return { ground: GLASS.ruby, border: GLASS.gold }
-    case 1: return { ground: GLASS.cobalt, border: GLASS.ruby }
-    case 2: return { ground: i % 2 ? GLASS.cobaltDeep : GLASS.cobalt, border: GLASS.ruby }
-    case 3: return { ground: GLASS.ruby, border: GLASS.cobalt }
-    case 4: return { ground: i % 3 === 0 ? GLASS.emerald : GLASS.cobalt, border: GLASS.gold }
-    default: return { ground: i % 2 ? GLASS.murrey : GLASS.cobalt, border: GLASS.ruby }
-  }
-}
-
 // ---- build the drawing ----------------------------------------------------------
 const svg = el('svg', { class: 'stage', preserveAspectRatio: 'xMidYMid meet' })
 document.getElementById('app')!.appendChild(svg)
 
 const defs = el('defs', {}, svg)
 defs.innerHTML = `
-  <pattern id="quarry" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-    <path d="M0 0H7M0 0V7" stroke="#05060c" stroke-width="0.55" opacity="0.85"/>
-  </pattern>
-  <radialGradient id="pane-light" cx="50%" cy="45%" r="60%">
-    <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
-    <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
-  </radialGradient>
   <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#5b74d6" stop-opacity="0.32"/>
     <stop offset="0.5" stop-color="#7b5fb0" stop-opacity="0.12"/>
@@ -135,19 +108,12 @@ const halo = el('circle', { r: PLATE_R * 1.5, fill: 'url(#halo)', opacity: 0 }, 
 // light bleeding past the rim of each pane: stacked soft strokes, not a blur
 // filter (a live filter re-rasterises the whole rose on every camera move)
 const bleed = el('g', { opacity: 0, 'stroke-linejoin': 'round', fill: 'none' }, lRose)
-const glassAll = el('g', { id: 'glass-all' }, lRose)
-const panes = roseOpenings.map((o, i) => {
-  const { ground, border } = paneColours(o.ring, i)
-  const cid = `c${i}`
-  el('clipPath', { id: cid }, defs).appendChild(el('path', { d: o.d }))
-  const g = el('g', { 'clip-path': `url(#${cid})`, opacity: 0 }, glassAll)
-  el('path', { d: o.d, fill: ground }, g)
-  el('path', { d: o.d, fill: 'url(#quarry)' }, g)
-  el('path', { d: o.d, fill: 'none', stroke: border, 'stroke-width': o.ring === 0 ? 5 : 3.2 }, g)
-  el('path', { d: o.d, fill: 'url(#pane-light)' }, g)
-  for (const [w, a] of [[9, 0.07], [5, 0.1]]) el('path', { d: o.d, stroke: ground, 'stroke-width': w, 'stroke-opacity': a }, bleed)
-  return { g, r: o.r }
-})
+// the glass (its body is the one group that gets the antique-glass distortion
+// when the view is at rest), then the lead cames above it, straight and crisp
+const glassAll = el('g', { id: 'glass-all', class: 'iso' }, lRose)
+const glassLead = el('g', { id: 'glass-lead', class: 'iso' }, lRose)
+// (the panes themselves are built after first paint: see buildGlass)
+const panes: { g: SVGElement[]; r: number }[] = []
 const stone = el('path', { d: plateFill(), class: 'stone', 'fill-rule': 'evenodd', opacity: 0 }, lRose)
 // the rim: a ring of voussoirs between the plate and the reveal
 const rimBand = el('path', { d: circle(REVEAL_R) + circle(PLATE_R), class: 'stone b', 'fill-rule': 'evenodd', opacity: 0 }, lRose)
@@ -163,23 +129,11 @@ const rims = [U * 1.0, PLATE_R, REVEAL_R].map((r) => drawn(circle(r), 'fine', lR
 // claire-voie: paired lancets, each pair under an arch whose head is a pierced plate
 const cv = claireVoie()
 const bayPlates = el('path', { d: cv.bays.map((b) => b.plate).join(''), class: 'stone a', 'fill-rule': 'evenodd', opacity: 0 }, lClaire)
-const claireGlass = cv.lancets.map((l, i) => {
-  const cid = `l${i}`
-  el('clipPath', { id: cid }, defs).appendChild(el('path', { d: l.d }))
-  const g = el('g', { 'clip-path': `url(#${cid})`, opacity: 0 }, lClaire)
-  el('path', { d: l.d, fill: i % 4 === 1 ? GLASS.ruby : GLASS.cobalt }, g)
-  el('path', { d: l.d, fill: 'url(#quarry)' }, g)
-  el('path', { d: l.d, fill: 'none', stroke: i % 4 === 1 ? GLASS.cobalt : GLASS.ruby, 'stroke-width': 2.6 }, g)
-  el('path', { d: l.d, fill: 'url(#pane-light)' }, g)
-  return { g, x: l.x }
-})
-// the oculus in each head: a ruby light with a cobalt quatrefoil at its heart
-const oculusGlass = cv.bays.map((b, i) => {
-  const g = el('g', { opacity: 0 }, lClaire)
-  el('path', { d: b.oculus, fill: i % 2 ? GLASS.cobalt : GLASS.ruby }, g)
-  el('path', { d: b.foil, fill: i % 2 ? GLASS.ruby : GLASS.cobalt, stroke: GLASS.gold, 'stroke-width': 0.5 }, g)
-  return { g, x: b.x }
-})
+// (the lancets' and oculi's glass is built after first paint too; these hold their place in the stack)
+const claireLancets = el('g', { class: 'iso' }, lClaire)
+const claireOculi = el('g', { class: 'iso' }, lClaire)
+const claireGlass: { g: SVGElement[]; x: number }[] = []
+const oculusGlass: { g: SVGElement[]; x: number }[] = []
 const claireInk = cv.lancets.map((l) => ({ p: drawn(l.d, 'fine', lClaire), x: l.x }))
 const bayInk = cv.bays.map((b) => ({ p: drawn(b.arch + b.oculus, 'fine', lClaire), x: b.x }))
 const foilInk = drawn(cv.bays.map((b) => b.foil).join(''), 'fine', lClaire)
@@ -270,6 +224,52 @@ function viewAt(g: number): View {
 
 // ---- scene 3 and the two swarms -----------------------------------------------------
 const vault = buildVaultScene(svg, defs)
+/**
+ * Every pane of glass (about a hundred and fifty, each a stack of layers) is
+ * built after the first paint, a few at a time, since none is visible until the
+ * viewer has scrolled a tenth of the way down.
+ */
+async function buildGlass(): Promise<void> {
+  let t = performance.now()
+  const slice = async () => {
+    if (performance.now() - t > 8) {
+      await new Promise<void>((r) => setTimeout(r, 0))
+      t = performance.now()
+    }
+  }
+  const hidden = (...gs: SVGElement[]) => gs.forEach((g) => { g.setAttribute('opacity', '0'); g.style.display = 'none' })
+  for (let i = 0; i < roseOpenings.length; i++) {
+    const o = roseOpenings[i]
+    const spec = rosePaneSpec(o.ring, i)
+    const { body, lead } = glassPane(glassAll, glassLead, defs, i, paneGeoFromPoints(o.d, o.pts), spec)
+    hidden(body, lead)
+    for (const [w, a] of [[8, 0.05], [4.5, 0.07]]) el('path', { d: o.d, stroke: glowColour(spec.base), 'stroke-width': w, 'stroke-opacity': a }, bleed)
+    panes.push({ g: [body, lead], r: o.r })
+    await slice()
+  }
+  for (let i = 0; i < cv.lancets.length; i++) {
+    const l = cv.lancets[i]
+    const top = l.springY - l.w * Math.sin(Math.PI / 3)
+    const geo = { d: l.d, base: [l.cx, FRAME.footY] as [number, number], ang: -Math.PI / 2, len: FRAME.footY - top, wid: l.w }
+    const { body, lead } = glassPane(claireLancets, claireLancets, defs, 2000 + i, geo, lancetSpec(i))
+    hidden(body, lead)
+    claireGlass.push({ g: [body, lead], x: l.x })
+    await slice()
+  }
+  for (let i = 0; i < cv.bays.length; i++) {
+    const b = cv.bays[i]
+    const geo = { d: b.oculus, base: [b.cx, b.cy + b.or] as [number, number], ang: -Math.PI / 2, len: 2 * b.or, wid: 2 * b.or }
+    const base = i % 2 ? 'blue' : 'ruby'
+    const { body, lead } = glassPane(claireOculi, claireOculi, defs, 3000 + i, geo, { base, mosaic: i % 2 ? 'ruby' : 'blue', variant: i, cell: 1.2, pearls: true, lead: 0.8 })
+    hidden(body, lead)
+    oculusGlass.push({ g: [body, lead], x: b.x })
+    await slice()
+  }
+  glassReady = true
+  redraw()
+}
+let glassReady = false
+
 // Building a swarm samples thousands of points along the outlines. That is far
 // too much to do before the first paint, so it starts just after it and works
 // in short slices (swarm.ts), one swarm after the other. Until a swarm is ready
@@ -278,9 +278,10 @@ type Swarm = Awaited<ReturnType<typeof buildSwarm>>
 let swarm1: Swarm | undefined
 let swarm2: Swarm | undefined
 setTimeout(async () => {
+  await buildGlass()
   // the rose's lines melt and land as the arches…
   swarm1 = await buildSwarm(
-    svg, defs,
+    svg,
     [
       ...roseOpenings.map((o) => o.d),
       circle(U), circle(PLATE_R), circle(REVEAL_R),
@@ -294,7 +295,7 @@ setTimeout(async () => {
   )
   redraw()
   // …and the arches' lines melt and land as the vault
-  swarm2 = await buildSwarm(svg, defs, arch.sources, vault.targets(), viewAt(T2_START), { seed: 13 })
+  swarm2 = await buildSwarm(svg, arch.sources, vault.targets(), viewAt(T2_START), { seed: 13 })
   redraw()
 }, 0)
 
@@ -314,6 +315,13 @@ const [panel, panel2, panel3] = overlay.querySelectorAll<HTMLElement>('.panel')
 const showPanel = (el: HTMLElement, v: number) => {
   el.style.opacity = String(v)
   el.style.transform = `translateY(calc(-50% + ${(1 - v) * 16}px))`
+}
+
+/** Opacity, and out of the layout tree entirely at zero: invisible nodes still cost something on every frame of a zoom. */
+function setGone(e: SVGElement, v: number): void {
+  setOp(e, v)
+  const d = v <= 0 ? 'none' : ''
+  if (e.style.display !== d) e.style.display = d
 }
 
 // ---- the timeline: everything from scroll progress -------------------------------
@@ -350,7 +358,7 @@ function render(G: number): void {
   setOp(rimBand, ramp(p, 0.34, 0.46))
 
   // 2. the glass lights up, centre outward
-  panes.forEach(({ g, r }) => setOp(g, ease(ramp(p, 0.36 + r * 0.14, 0.42 + r * 0.14))))
+  panes.forEach(({ g, r }) => g.forEach((e) => setGone(e, ease(ramp(p, 0.36 + r * 0.14, 0.42 + r * 0.14)))))
   setOp(bleed, ramp(p, 0.42, 0.58))
   setOp(halo, ramp(p, 0.45, 0.62))
 
@@ -367,8 +375,8 @@ function render(G: number): void {
   bayInk.forEach(({ p: path, x }) => setDraw(path, ease(ramp(p, 0.7 + x * 0.06, 0.8 + x * 0.06))))
   setOp(bayPlates, ramp(p, 0.76, 0.84) * dim)
   setDraw(foilInk, ramp(p, 0.78, 0.86))
-  claireGlass.forEach(({ g, x }) => setOp(g, ease(ramp(p, 0.76 + x * 0.06, 0.82 + x * 0.06)) * dim))
-  oculusGlass.forEach(({ g, x }) => setOp(g, ease(ramp(p, 0.8 + x * 0.06, 0.86 + x * 0.06)) * dim))
+  claireGlass.forEach(({ g, x }) => g.forEach((e) => setGone(e, ease(ramp(p, 0.76 + x * 0.06, 0.82 + x * 0.06)) * dim)))
+  oculusGlass.forEach(({ g, x }) => g.forEach((e) => setGone(e, ease(ramp(p, 0.8 + x * 0.06, 0.86 + x * 0.06)) * dim)))
   setDraw(wallLines, ease(ramp(p, 0.7, 0.9)))
   shafts.forEach((sh, i) => setOp(sh, ease(ramp(p, 0.8 + i * 0.03, 0.92 + i * 0.03))))
 
@@ -376,12 +384,14 @@ function render(G: number): void {
   // glass, light and wall fade first, leaving the drawing...
   for (const g of [lWall, lShafts]) setOp(g, dim)
   glassAll.style.opacity = String(dim)
+  glassLead.style.opacity = String(dim)
   setOp(bleed, ramp(p, 0.42, 0.58) * dim)
   setOp(halo, ramp(p, 0.45, 0.62) * dim)
   setOp(stone, ramp(p, 0.3, 0.42) * dim)
   setOp(rimBand, ramp(p, 0.34, 0.46) * dim)
   // ...then the fragments take over the lines exactly where they lie
-  const solid = swarm1 ? 1 - ramp(P, FRAG_START, FRAG_START + 0.012) : 1
+  // (until the swarm is ready the solid drawing holds through its transition, but never past it)
+  const solid = swarm1 ? 1 - ramp(P, FRAG_START, FRAG_START + 0.012) : P < FRAG_END ? 1 : 0
   for (const g of [lRose, lFrame, lClaire]) setShow(g, solid)
   swarm1?.update(
     ramp(P, FRAG_START, FRAG_END), view,
@@ -390,7 +400,7 @@ function render(G: number): void {
 
   // ---- scene 2 -------------------------------------------------------------
   const q = ramp(P, S2_START, 1)
-  const out2 = swarm2 ? ramp(G, T2_START, T2_START + 0.012) : 0
+  const out2 = swarm2 ? ramp(G, T2_START, T2_START + 0.012) : G < T2_END ? 0 : 1
   arch.update(q, ramp(P, FRAG_END - 0.02, FRAG_END + 0.01), P * 900, out2)
 
   // ---- transition 2 and scene 3 ---------------------------------------------
@@ -413,6 +423,9 @@ let current = 0
 const vel = { v: 0 }
 let last = performance.now()
 let drawn_ = -1
+/** how settled the view is (0 moving … 1 at rest): the costly glass texture fades in only at rest */
+let fx = 0
+let fxDrawn = -1
 /** draw the next frame even if the scroll position hasn't moved (a swarm just became ready) */
 const redraw = () => { drawn_ = -1 }
 let drawnW = 0
@@ -432,6 +445,12 @@ const tick = (now: number) => {
     current = smoothDamp(vel, current, target, 0.32, dt)
     if (Math.abs(target - current) < 2e-6 && Math.abs(vel.v) < 1e-4) { current = target; vel.v = 0 }
   }
+  const moving = current !== target || Math.abs(vel.v) > 1e-5
+  // eased, then quantised to a few steps: each step repaints the grain layer, which is the costly one
+  fx += ((moving || !glassReady ? 0 : 1) - fx) * (1 - Math.exp(-dt / (moving ? 0.06 : 0.3)))
+  if (!moving && fx > 0.97) fx = 1
+  const fxStep = Math.round(fx * 4) / 4
+  if (fxStep !== fxDrawn) { fxDrawn = fxStep; setFx(fxStep, svg, glassAll) }
   // nothing moved: leave the frame as it is
   if (current !== drawn_ || innerWidth !== drawnW || innerHeight !== drawnH) {
     drawn_ = current

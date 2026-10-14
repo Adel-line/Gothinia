@@ -33,7 +33,6 @@ function turn(a0: number, a1: number): number {
 
 export async function buildSwarm(
   svg: Element,
-  defs: Element,
   sources: string[],
   targets: string[],
   view0: View,
@@ -44,7 +43,13 @@ export async function buildSwarm(
   let seed = opts.seed ?? 7
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 
-  const sampler = el('path', {}, defs)
+  // measured in a tiny SVG of its own: reading a path's length makes the browser
+  // bring styles up to date, which is slow over the whole drawing's thousands of nodes
+  const host = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  host.setAttribute('width', '0'); host.setAttribute('height', '0')
+  host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden'
+  document.body.appendChild(host)
+  const sampler = el('path', {}, host)
   // sampling thousands of points is slow, so it works in slices of a few
   // milliseconds and lets the page paint and scroll in between
   let sliceStart = performance.now()
@@ -179,5 +184,6 @@ export async function buildSwarm(
     path.setAttribute('d', d)
   }
 
+  host.remove()
   return { update }
 }
