@@ -31,7 +31,7 @@ function turn(a0: number, a1: number): number {
   return ((((a1 - a0) % Math.PI) + Math.PI * 1.5) % Math.PI) - Math.PI / 2
 }
 
-export function buildSwarm(
+export async function buildSwarm(
   svg: Element,
   defs: Element,
   sources: string[],
@@ -45,29 +45,51 @@ export function buildSwarm(
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 
   const sampler = el('path', {}, defs)
-  /** about N points spread over the outlines in proportion to their length */
-  function sample(ds: string[], n: number): Pt[] {
-    const lens = ds.map((d) => {
+  // sampling thousands of points is slow, so it works in slices of a few
+  // milliseconds and lets the page paint and scroll in between
+  let sliceStart = performance.now()
+  const slice = async () => {
+    if (performance.now() - sliceStart > 8) {
+      await new Promise<void>((r) => setTimeout(r, 0))
+      sliceStart = performance.now()
+    }
+  }
+  /**
+   * About n points spread over the outlines in proportion to their length.
+   * `getPointAtLength` walks a path from its start, so a long compound path
+   * costs quadratic time: each sub-path is sampled on its own instead.
+   */
+  async function sample(ds: string[], n: number): Promise<Pt[]> {
+    const subs = ds.flatMap((d) => d.split(/(?=M)/)).filter((d) => d.length > 1)
+    const lens: number[] = []
+    for (const d of subs) {
+      await slice()
       sampler.setAttribute('d', d)
-      return sampler.getTotalLength()
-    })
+      lens.push(sampler.getTotalLength())
+    }
     const total = lens.reduce((a, b) => a + b, 0) || 1
     const out: Pt[] = []
-    ds.forEach((d, i) => {
+    let carry = 0 // fractional pieces owed, so short sub-paths aren't all rounded away
+    for (let i = 0; i < subs.length; i++) {
+      const d = subs[i]
+      carry += (lens[i] / total) * n
+      const m = Math.floor(carry)
+      carry -= m
+      if (!m) continue
+      await slice()
       sampler.setAttribute('d', d)
-      const m = Math.round((lens[i] / total) * n)
       for (let j = 0; j < m; j++) {
         const at = ((j + rnd() * 0.8) / m) * lens[i]
         const p0 = sampler.getPointAtLength(at)
         const p1 = sampler.getPointAtLength(Math.min(lens[i], at + 0.5))
         out.push({ x: p0.x, y: p0.y, a: Math.atan2(p1.y - p0.y, p1.x - p0.x) })
       }
-    })
+    }
     return out
   }
 
-  const from = sample(sources, N)
-  const to = sample(targets, N)
+  const from = await sample(sources, N)
+  const to = await sample(targets, N)
   // pair them left to right, so the stream has a direction rather than a scramble
   from.sort((a, b) => a.x - b.x)
   to.sort((a, b) => a.x - b.x)

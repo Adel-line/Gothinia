@@ -270,22 +270,33 @@ function viewAt(g: number): View {
 
 // ---- scene 3 and the two swarms -----------------------------------------------------
 const vault = buildVaultScene(svg, defs)
-// the rose's lines melt and land as the arches…
-const swarm1 = buildSwarm(
-  svg, defs,
-  [
-    ...roseOpenings.map((o) => o.d),
-    circle(U), circle(PLATE_R), circle(REVEAL_R),
-    ...ORDERS.map((o) => archOrder(o)),
-    ...cv.lancets.map((l) => l.d),
-    ...cv.bays.map((b) => b.arch),
-  ],
-  arch.targets,
-  viewAt(FRAG_START * G_A),
-  { seed: 7 },
-)
-// …and the arches' lines melt and land as the vault
-const swarm2 = buildSwarm(svg, defs, arch.sources, vault.targets(), viewAt(T2_START), { seed: 13 })
+// Building a swarm samples thousands of points along the outlines. That is far
+// too much to do before the first paint, so it starts just after it and works
+// in short slices (swarm.ts), one swarm after the other. Until a swarm is ready
+// its transition simply holds the solid drawing.
+type Swarm = Awaited<ReturnType<typeof buildSwarm>>
+let swarm1: Swarm | undefined
+let swarm2: Swarm | undefined
+setTimeout(async () => {
+  // the rose's lines melt and land as the arches…
+  swarm1 = await buildSwarm(
+    svg, defs,
+    [
+      ...roseOpenings.map((o) => o.d),
+      circle(U), circle(PLATE_R), circle(REVEAL_R),
+      ...ORDERS.map((o) => archOrder(o)),
+      ...cv.lancets.map((l) => l.d),
+      ...cv.bays.map((b) => b.arch),
+    ],
+    arch.targets,
+    viewAt(FRAG_START * G_A),
+    { seed: 7 },
+  )
+  redraw()
+  // …and the arches' lines melt and land as the vault
+  swarm2 = await buildSwarm(svg, defs, arch.sources, vault.targets(), viewAt(T2_START), { seed: 13 })
+  redraw()
+}, 0)
 
 // ---- overlay ------------------------------------------------------------------------
 const overlay = document.getElementById('overlay')!
@@ -370,20 +381,20 @@ function render(G: number): void {
   setOp(stone, ramp(p, 0.3, 0.42) * dim)
   setOp(rimBand, ramp(p, 0.34, 0.46) * dim)
   // ...then the fragments take over the lines exactly where they lie
-  const solid = 1 - ramp(P, FRAG_START, FRAG_START + 0.012)
+  const solid = swarm1 ? 1 - ramp(P, FRAG_START, FRAG_START + 0.012) : 1
   for (const g of [lRose, lFrame, lClaire]) setShow(g, solid)
-  swarm1.update(
+  swarm1?.update(
     ramp(P, FRAG_START, FRAG_END), view,
     ramp(P, FRAG_START, FRAG_START + 0.012) * (1 - ramp(P, FRAG_END - 0.02, FRAG_END)),
   )
 
   // ---- scene 2 -------------------------------------------------------------
   const q = ramp(P, S2_START, 1)
-  const out2 = ramp(G, T2_START, T2_START + 0.012)
+  const out2 = swarm2 ? ramp(G, T2_START, T2_START + 0.012) : 0
   arch.update(q, ramp(P, FRAG_END - 0.02, FRAG_END + 0.01), P * 900, out2)
 
   // ---- transition 2 and scene 3 ---------------------------------------------
-  swarm2.update(ramp(G, T2_START, T2_END), view, out2 * (1 - ramp(G, T2_END - 0.02, T2_END)))
+  swarm2?.update(ramp(G, T2_START, T2_END), view, out2 * (1 - ramp(G, T2_END - 0.02, T2_END)))
   const q3 = ramp(G, S3_START, 1)
   vault.update(q3, ramp(G, T2_END - 0.02, T2_END + 0.01), G * 1400)
 
@@ -402,6 +413,8 @@ let current = 0
 const vel = { v: 0 }
 let last = performance.now()
 let drawn_ = -1
+/** draw the next frame even if the scroll position hasn't moved (a swarm just became ready) */
+const redraw = () => { drawn_ = -1 }
 let drawnW = 0
 let drawnH = 0
 const readScroll = () => {
