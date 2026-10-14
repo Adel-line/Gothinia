@@ -1,5 +1,5 @@
 import './svg.css'
-import { sections } from '../content/sections'
+import { sections, vaultSection } from '../content/sections'
 import {
   ORDERS,
   PLATE_R,
@@ -20,8 +20,11 @@ import {
   roseOpenings,
   stringCourse,
 } from './geometry'
-import { drawn, ease, ease5, el, monotone, ramp, setDraw, setOp, setShow, smoothDamp } from './dom'
+import { drawn, ease, el, monotone, ramp, setDraw, setOp, setShow, smoothDamp } from './dom'
 import { ROUND_X, buildArchScene } from './archScene'
+import { buildSwarm } from './swarm'
+import type { View } from './swarm'
+import { buildVaultScene } from './vaultScene'
 
 /**
  * Prototype: Gothic architecture as a mason's drawing brought to life.
@@ -31,18 +34,25 @@ import { ROUND_X, buildArchScene } from './archScene'
  * reveal the arch, the string course and the claire-voie, each layer moving at
  * its own rate so the flat drawing reads with depth.
  *
- * Transition: the glass dims, then every line of the window breaks into
- * fragments that drift and reform as the two arches of scene 2.
+ * Transition: the glass dims, then the lines melt, run to the bottom of the
+ * screen, lift into a swarm that holds its place while the camera zooms, and
+ * land as the two arches of scene 2 (swarm.ts).
  *
- * Scene 2, the pointed arch (archScene.ts), ends with its windows glazed.
+ * Scene 2, the pointed arch (archScene.ts), ends with its windows glazed;
+ * its lines melt and land as scene 3, the rib vault (vaultScene.ts).
  *
  * Everything is a pure function of scroll progress, so scrolling back up
  * reverses it.
  */
 
-// global progress: scene 1 runs 0 → 0.46 (its own timeline is P / 0.46),
-// its text holds to 0.5; the lines break up and reform 0.535 → 0.67;
-// scene 2 runs 0.68 → 1
+// Scenes 1 and 2 keep their own timeline P (0 → 1): scene 1 runs 0 → 0.46
+// (its own timeline is P / 0.46), its text holds to 0.5; the lines melt and
+// reform 0.535 → 0.67; scene 2 runs 0.68 → 1. The page's progress G (0 → 1)
+// covers those over 0 → G_A, then the arches melt into the vault, scene 3.
+const G_A = 0.58
+const T2_START = 0.615 // the arches begin to melt
+const T2_END = 0.775 // …and have landed as the vault
+const S3_START = 0.765 // scene 3's own timeline runs from here to 1
 const S1 = 0.46
 const S2_START = 0.68
 // the rose's lines break apart and reform as the arches between these
@@ -190,7 +200,6 @@ const capInk = drawn(nooks.ink, 'fine', lFrame)
 const AK = 0.8
 const ARCH = { x: -(ROUND_X / 2) * AK, y: 34 - 50 * AK, k: AK }
 const arch = buildArchScene(svg, defs, ARCH)
-const fragments = buildFragments()
 /** a camera shot framing a box given in the arch's local units */
 const archShot = (x0: number, y0: number, x1: number, y1: number): Shot => ({
   cx: ARCH.x + ((x0 + x1) / 2) * ARCH.k,
@@ -198,11 +207,12 @@ const archShot = (x0: number, y0: number, x1: number, y1: number): Shot => ({
   w: (x1 - x0) * ARCH.k,
   h: (y1 - y0) * ARCH.k,
 })
-const q2 = (q: number) => S2_START + q * (1 - S2_START) // scene-2 local → global
+const q2 = (q: number) => S2_START + q * (1 - S2_START) // scene-2 local → global (P)
 const WIDE = archShot(-110, -175, ROUND_X + 190, 268)
+const zoomed = (sh: Shot, k: number): Shot => ({ ...sh, w: sh.w * k, h: sh.h * k })
 const SHOTS2: [number, Shot][] = [
-  // the text goes, the camera centres on where the arches will stand
-  [0.56, WIDE],
+  // while the rose melts the camera breathes out, then in on where the arches will stand
+  [0.59, zoomed(WIDE, 1.9)],
   [q2(0.04), WIDE],
   // close on the pointed arch for the compass work, then back out
   [q2(0.09), archShot(-95, -125, 95, 45)],
@@ -225,121 +235,57 @@ const SHOTS: [number, Shot][] = [
   [S1, { cx: -95, cy: 34, w: 560, h: 452 }],
   [0.5, { cx: -95, cy: 34, w: 560, h: 452 }],
 ]
+// scene 3: the arches' last shot, a wide breath out while they melt, then the
+// vault, which is walked through by the scene itself (its camera is in 3D)
+const ARCH_END = archShot(-380, -175, ROUND_X + 170, 268)
+const VAULT: Shot = { cx: 0, cy: -40, w: 1000, h: 640 }
+const SHOTS3: [number, Shot][] = [
+  [T2_START, ARCH_END],
+  [(T2_START + T2_END) / 2 + 0.01, zoomed(ARCH_END, 1.7)],
+  [T2_END + 0.01, VAULT],
+  [0.93, VAULT],
+  // make room for the text on the left
+  [1.0, { ...VAULT, cx: -150 }],
+]
 // one monotone cubic per channel through every shot: the dolly keeps a
 // continuous velocity through the waypoints and only comes to rest on a hold
-const ALL_SHOTS = SHOTS.concat(SHOTS2)
+const ALL_SHOTS: [number, Shot][] = [...SHOTS, ...SHOTS2].map(([p, sh]) => [p * G_A, sh] as [number, Shot]).concat(SHOTS3)
 const keys = ALL_SHOTS.map(([p]) => p)
 const camCx = monotone(keys, ALL_SHOTS.map(([, s]) => s.cx))
 const camCy = monotone(keys, ALL_SHOTS.map(([, s]) => s.cy))
 // zoom in log space so the dolly moves at an even pace
 const camLw = monotone(keys, ALL_SHOTS.map(([, s]) => Math.log(s.w)))
 const camLh = monotone(keys, ALL_SHOTS.map(([, s]) => Math.log(s.h)))
-function camera(p: number): Shot {
-  return { cx: camCx(p), cy: camCy(p), w: Math.exp(camLw(p)), h: Math.exp(camLh(p)) }
+function camera(g: number): Shot {
+  return { cx: camCx(g), cy: camCy(g), w: Math.exp(camLw(g)), h: Math.exp(camLh(g)) }
+}
+/** what the camera sees at G, fitted to the window (contain) */
+function viewAt(g: number): View {
+  const s = camera(g)
+  const asp = innerWidth / innerHeight
+  const vw = s.w / s.h > asp ? s.w : s.h * asp
+  const vh = vw / asp
+  return { x: s.cx - vw / 2, y: s.cy - vh / 2, w: vw, h: vh }
 }
 
-
-// ---- fragments: the rose's lines breaking up and reforming -------------------------
-/**
- * Short pieces of line sampled along every outline of the window, each sent
- * to a point on the arches' outlines. Each piece first loosens and drifts
- * (outer parts first), then sweeps along a curve to its new place, turning
- * to lie along the new line. Drawn as one path, rebuilt each frame only
- * while the transition is running.
- */
-function buildFragments() {
-  const N = 2200
-  const LEN = 3 // drawing units per piece
-  const sampler = el('path', {}, defs)
-  /** N points spread over the outlines in proportion to their length */
-  function sample(ds: string[]): { x: number; y: number; a: number; r: number }[] {
-    const lens = ds.map((d) => {
-      sampler.setAttribute('d', d)
-      return sampler.getTotalLength()
-    })
-    const total = lens.reduce((a, b) => a + b, 0)
-    const out: { x: number; y: number; a: number; r: number }[] = []
-    let seed = 7
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-    ds.forEach((d, i) => {
-      sampler.setAttribute('d', d)
-      const n = Math.round((lens[i] / total) * N)
-      for (let j = 0; j < n; j++) {
-        const at = ((j + rnd() * 0.8) / n) * lens[i]
-        const p0 = sampler.getPointAtLength(at)
-        const p1 = sampler.getPointAtLength(Math.min(lens[i], at + 0.5))
-        out.push({ x: p0.x, y: p0.y, a: Math.atan2(p1.y - p0.y, p1.x - p0.x), r: Math.hypot(p0.x, p0.y) })
-      }
-    })
-    return out
-  }
-  const from = sample([
+// ---- scene 3 and the two swarms -----------------------------------------------------
+const vault = buildVaultScene(svg, defs)
+// the rose's lines melt and land as the arches…
+const swarm1 = buildSwarm(
+  svg, defs,
+  [
     ...roseOpenings.map((o) => o.d),
     circle(U), circle(PLATE_R), circle(REVEAL_R),
     ...ORDERS.map((o) => archOrder(o)),
     ...cv.lancets.map((l) => l.d),
     ...cv.bays.map((b) => b.arch),
-  ])
-  const to = sample(arch.targets)
-  // pair them roughly left-to-right so the flow has a direction, not a scramble
-  const byX = (a: { x: number }, b: { x: number }) => a.x - b.x
-  from.sort(byX)
-  to.sort(byX)
-  let seed = 11
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  const pieces = from.map((f, i) => {
-    const t = to[Math.floor((i / from.length) * to.length)]
-    const mx = (f.x + t.x) / 2
-    const my = (f.y + t.y) / 2
-    const bend = (rnd() - 0.5) * 140
-    const d = Math.hypot(t.x - f.x, t.y - f.y) || 1
-    return {
-      f, t,
-      // control point: off to one side of the straight path, lifted a little
-      cx: mx + (-(t.y - f.y) / d) * bend,
-      cy: my + ((t.x - f.x) / d) * bend - 30,
-      // loosening drift
-      dx: (rnd() - 0.5) * 10,
-      dy: (rnd() - 0.5) * 10 - 4,
-      // outer parts of the window go first
-      delay: (1 - Math.min(1, f.r / 260)) * 0.45 + rnd() * 0.15,
-      spin: (rnd() - 0.5) * 2.5,
-      // a piece of line has no direction: turn the short way (at most a quarter turn)
-      turn: ((((t.a - f.a) % Math.PI) + Math.PI * 1.5) % Math.PI) - Math.PI / 2,
-    }
-  })
-  const path = el('path', { class: 'ink fine fragments' }, svg)
-  path.style.visibility = 'hidden'
-
-  function update(P: number): void {
-    const u = ramp(P, FRAG_START, FRAG_END)
-    if (u <= 0 || u >= 1) {
-      setShow(path, 0)
-      return
-    }
-    // the lines loosen into pieces (cross-fading with the solid drawing),
-    // and the last stretch hands over to the drawn arches
-    setShow(path, ramp(P, FRAG_START, FRAG_START + 0.012) * (1 - ramp(P, FRAG_END - 0.02, FRAG_END)))
-    let d = ''
-    for (const pc of pieces) {
-      const loose = ease5(ramp(u, pc.delay * 0.6, pc.delay * 0.6 + 0.12))
-      const go = ease5(ramp(u, pc.delay, pc.delay + 0.4))
-      // quadratic Bézier from source to target via the control point
-      const a = 1 - go
-      let x = a * a * pc.f.x + 2 * a * go * pc.cx + go * go * pc.t.x
-      let y = a * a * pc.f.y + 2 * a * go * pc.cy + go * go * pc.t.y
-      const drift = loose * (1 - go)
-      x += pc.dx * drift
-      y += pc.dy * drift
-      const ang = pc.f.a + pc.turn * go + pc.spin * Math.sin(Math.PI * go)
-      const ex = Math.cos(ang) * LEN * 0.5
-      const ey = Math.sin(ang) * LEN * 0.5
-      d += `M${(x - ex).toFixed(2)} ${(y - ey).toFixed(2)}L${(x + ex).toFixed(2)} ${(y + ey).toFixed(2)}`
-    }
-    path.setAttribute('d', d)
-  }
-  return { update }
-}
+  ],
+  arch.targets,
+  viewAt(FRAG_START * G_A),
+  { seed: 7 },
+)
+// …and the arches' lines melt and land as the vault
+const swarm2 = buildSwarm(svg, defs, arch.sources, vault.targets(), viewAt(T2_START), { seed: 13 })
 
 // ---- overlay ------------------------------------------------------------------------
 const overlay = document.getElementById('overlay')!
@@ -351,9 +297,9 @@ const panelHtml = (c: (typeof sections)[number]) => `
   </div>`
 overlay.innerHTML =
   `<div class="intro"><div class="kicker">Gothinia</div><div class="cue">Scroll to draw</div></div>` +
-  panelHtml(sections[0]) + panelHtml(sections[1])
+  panelHtml(sections[0]) + panelHtml(sections[1]) + panelHtml(vaultSection)
 const intro = overlay.querySelector<HTMLElement>('.intro')!
-const [panel, panel2] = overlay.querySelectorAll<HTMLElement>('.panel')
+const [panel, panel2, panel3] = overlay.querySelectorAll<HTMLElement>('.panel')
 const showPanel = (el: HTMLElement, v: number) => {
   el.style.opacity = String(v)
   el.style.transform = `translateY(calc(-50% + ${(1 - v) * 16}px))`
@@ -361,15 +307,14 @@ const showPanel = (el: HTMLElement, v: number) => {
 
 // ---- the timeline: everything from scroll progress -------------------------------
 
-function render(P: number): void {
+function render(G: number): void {
+  const P = Math.min(1, G / G_A) // scenes 1 and 2's own timeline
   // camera → viewBox, fitted to the window (contain)
-  const s = camera(P)
+  const view = viewAt(G)
+  const vw = view.w
   const p = Math.min(1, P / S1) // scene 1's own timeline
-  const dim = 1 - ease(ramp(P, 0.5, 0.54)) // the glass dims before the lines break
-  const A = innerWidth / innerHeight
-  const vw = s.w / s.h > A ? s.w : s.h * A
-  const vh = vw / A
-  svg.setAttribute('viewBox', `${s.cx - vw / 2} ${s.cy - vh / 2} ${vw} ${vh}`)
+  const dim = 1 - ease(ramp(P, 0.5, 0.54)) // the glass dims before the lines melt
+  svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`)
   // keep lines hairline-thin on screen at every zoom
   svg.style.setProperty('--px', String(vw / innerWidth))
 
@@ -427,16 +372,26 @@ function render(P: number): void {
   // ...then the fragments take over the lines exactly where they lie
   const solid = 1 - ramp(P, FRAG_START, FRAG_START + 0.012)
   for (const g of [lRose, lFrame, lClaire]) setShow(g, solid)
-  fragments.update(P)
+  swarm1.update(
+    ramp(P, FRAG_START, FRAG_END), view,
+    ramp(P, FRAG_START, FRAG_START + 0.012) * (1 - ramp(P, FRAG_END - 0.02, FRAG_END)),
+  )
 
   // ---- scene 2 -------------------------------------------------------------
   const q = ramp(P, S2_START, 1)
-  arch.update(q, ramp(P, FRAG_END - 0.02, FRAG_END + 0.01), P * 900)
+  const out2 = ramp(G, T2_START, T2_START + 0.012)
+  arch.update(q, ramp(P, FRAG_END - 0.02, FRAG_END + 0.01), P * 900, out2)
+
+  // ---- transition 2 and scene 3 ---------------------------------------------
+  swarm2.update(ramp(G, T2_START, T2_END), view, out2 * (1 - ramp(G, T2_END - 0.02, T2_END)))
+  const q3 = ramp(G, S3_START, 1)
+  vault.update(q3, ramp(G, T2_END - 0.02, T2_END + 0.01), G * 1400)
 
   // overlay
   intro.style.opacity = String(1 - ramp(p, 0.01, 0.05))
   showPanel(panel, ramp(p, 0.86, 0.93) * (1 - ramp(P, 0.48, 0.52)))
-  showPanel(panel2, ramp(q, 0.86, 0.93))
+  showPanel(panel2, ramp(q, 0.86, 0.93) * (1 - ramp(G, T2_START - 0.03, T2_START)))
+  showPanel(panel3, ramp(q3, 0.84, 0.94))
 }
 
 // ---- scroll: a critically damped spring toward the scroll position -----------------

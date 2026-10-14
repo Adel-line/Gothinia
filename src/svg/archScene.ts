@@ -395,8 +395,12 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
    * outlines have taken over from the fragments; flowPhase: how far the
    * thrust has travelled (local units).
    */
-  function update(q: number, formed: number, flowPhase: number): void {
-    setOp(g, formed)
+  function update(q: number, formed: number, flowPhase: number, out = 0): void {
+    // leaving: glass, stone, wall and forces dim first; the ink lines go when the swarm takes them
+    const fills = 1 - ramp(out, 0, 0.5)
+    setOp(g, formed * (1 - ramp(out, 0.5, 1)))
+    setOp(gWall, fills)
+    setOp(gForce, fills)
     // 1. compass: each half retraced as its arm sweeps
     const compassOut = 1 - ramp(q, 0.24, 0.3)
     setOp(centres, Math.min(ramp(q, 0.03, 0.06), compassOut))
@@ -416,7 +420,7 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     setOp(outlineInk, 1 - 0.6 * Math.min(ramp(q, 0.03, 0.06), 1 - ramp(q, 0.22, 0.28)))
     // 2. stone
     setOp(jointInk, ramp(q, 0.26, 0.32))
-    setOp(stone, ramp(q, 0.26, 0.34))
+    setOp(stone, ramp(q, 0.26, 0.34) * fills)
     // the masonry draws itself in: courses, mouldings, capitals, shafts, hood, wall
     setDraw(groundInk, ease(ramp(q, 0.28, 0.36)))
     setDraw(courseInk, ease(ramp(q, 0.3, 0.4)))
@@ -443,9 +447,11 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     const yTop = PIER_FOOT + 20 - lit * (PIER_FOOT + APEX + 60)
     maskRect.setAttribute('y', Y(yTop))
     maskRect.setAttribute('height', S(PIER_FOOT + 60 - yTop))
-    setOp(gGlass, lit > 0 ? 1 : 0)
-    setOp(gGlow, 0.7 * ease(ramp(q, 0.8, 0.9)))
+    setOp(gGlass, (lit > 0 ? 1 : 0) * fills)
+    setOp(gGlow, 0.7 * ease(ramp(q, 0.8, 0.9)) * fills)
   }
 
-  return { update, targets }
+  /** every line of the drawing, for the swarm to melt */
+  const sources = [...outlines.map(([d]) => d), courseD, mouldD, capD, shaftD, groundD, hoodD, crockets + finial]
+  return { update, targets, sources }
 }
