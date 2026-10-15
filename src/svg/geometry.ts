@@ -12,7 +12,7 @@ import { buildRose } from './rose'
 export const U = 100 // svg units: 100 = the edge of the glazing
 const W = U / 4.5 // svg units per world unit of the 3D version's frame
 
-export interface Opening {
+interface Opening {
   d: string
   /** distance of the opening's centre from the rose's centre, 0..1 */
   r: number
