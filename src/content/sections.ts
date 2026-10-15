@@ -83,3 +83,19 @@ export const gargoyleSection: SectionContent = {
     'down mortar undoes a building. Its face is a mason\'s joke, made useful.',
   calloutLabels: [],
 }
+
+/** The drawn version's fourth scene (the flying buttress); the 3D scenes don't use it. */
+export const buttressSection: SectionContent = {
+  id: 'flying-buttress',
+  kicker: 'Gothic structure · from c. 1180',
+  title: 'The Flying Buttress',
+  body:
+    'A stone vault pushes outward as well as down, and a thin wall cannot hold ' +
+    'that push alone. So the masons moved the support outside. A flying arch ' +
+    'catches the thrust high on the wall and carries it over the aisle roof to ' +
+    'a pier that stands clear of the building. The pinnacle on top is not ' +
+    'decoration: its weight presses the pier down and keeps the line of force ' +
+    'inside the stone. With the wall freed from carrying the vault, it could ' +
+    'be filled with glass.',
+  calloutLabels: [],
+}

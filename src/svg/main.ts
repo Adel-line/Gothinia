@@ -1,5 +1,5 @@
 import './svg.css'
-import { gargoyleSection, sections, vaultSection } from '../content/sections'
+import { buttressSection, sections, vaultSection } from '../content/sections'
 import {
   ORDERS,
   PLATE_R,
@@ -26,7 +26,7 @@ import { buildSwarm } from './swarm'
 import { glassPane, glowColour, lancetSpec, rosePaneSpec, paneGeoFromPoints, setFx } from './glass'
 import type { View } from './swarm'
 import { buildVaultScene } from './vaultScene'
-import { buildGargoyleScene } from './gargoyleScene'
+import { buildButtressScene } from './buttressScene'
 
 /**
  * Prototype: Gothic architecture as a mason's drawing brought to life.
@@ -221,9 +221,9 @@ const SHOTS4: [number, Shot][] = [
   [(T3_START + T3_END) / 2, zoomed({ ...VAULT, cx: -150 }, 1.6)],
   [T3_END + 0.006, BUTTRESS],
   [q4(0.4), BUTTRESS],
-  [q4(0.52), gShot(140, -440, 480, -190)], // close on the gargoyle
-  [q4(0.7), gShot(140, -440, 480, -190)],
-  [q4(0.82), BUTTRESS_TEXT],
+  [q4(0.52), gShot(60, -580, 330, -120)], // close on the pier and pinnacle for the test
+  [q4(0.82), gShot(60, -580, 330, -120)],
+  [q4(0.92), BUTTRESS_TEXT],
   [1.0, BUTTRESS_TEXT],
 ]
 // one monotone cubic per channel through every shot: the dolly keeps a
@@ -249,7 +249,7 @@ function viewAt(g: number): View {
 
 // ---- scene 3 and the two swarms -----------------------------------------------------
 const vault = buildVaultScene(svg, defs)
-const garg = buildGargoyleScene(svg, GP)
+const garg = buildButtressScene(svg, GP)
 /**
  * Every pane of glass (about a hundred and fifty, each a stack of layers) is
  * built after the first paint, a few at a time, since none is visible until the
@@ -340,7 +340,7 @@ const panelHtml = (c: (typeof sections)[number]) => `
   </div>`
 overlay.innerHTML =
   `<div class="intro"><div class="kicker">Gothinia</div><div class="cue">Scroll to draw</div></div>` +
-  panelHtml(sections[0]) + panelHtml(sections[1]) + panelHtml(vaultSection) + panelHtml(gargoyleSection)
+  panelHtml(sections[0]) + panelHtml(sections[1]) + panelHtml(vaultSection) + panelHtml(buttressSection)
 const intro = overlay.querySelector<HTMLElement>('.intro')!
 const [panel, panel2, panel3, panel4] = overlay.querySelectorAll<HTMLElement>('.panel')
 const showPanel = (el: HTMLElement, v: number) => {
