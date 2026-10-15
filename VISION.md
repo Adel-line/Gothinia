@@ -12,9 +12,9 @@ It is not a museum.
 
 It is not a game.
 
-It is an immersive digital documentary where the visitor discovers how Gothic architecture works by physically moving through the building.
+It is a scroll-driven documentary in which the visitor discovers how Gothic architecture works by watching a mason's drawing come to life.
 
-Scrolling should feel like walking through a cathedral.
+Scrolling should feel like looking over the shoulder of a master mason as he sets out the building with compass and rule.
 
 The experience should evoke awe, curiosity and wonder rather than simply presenting information.
 
@@ -26,9 +26,25 @@ The architecture is the protagonist.
 
 Every design decision should answer one question:
 
-> Does this increase the feeling that the visitor is exploring a real medieval cathedral?
+> Does this make the visitor feel they are watching a real medieval mason work out how a cathedral stands up?
 
 If the answer is no, it should not be implemented.
+
+---
+
+# The Drawing
+
+The whole site is a single drawing.
+
+Pale lines on dark vellum, struck from true arcs and straight lines, set out as the masons did: a centre, a compass, a rule.
+
+No photographs. No textures. No render.
+
+The drawing is not a diagram of the cathedral. It is how the cathedral was thought.
+
+Construction lines appear first, then the stone is drawn over them, and the guides stay as faint ghosts of the geometry underneath.
+
+Lines are drawn, never faded in. Scrolling forward draws them. Scrolling back un-draws them.
 
 ---
 
@@ -93,7 +109,7 @@ Less decoration.
 
 More authenticity.
 
-The architecture itself should tell the story.
+The geometry itself should tell the story.
 
 ---
 
@@ -103,16 +119,13 @@ The visitor begins extremely close to a detail.
 
 They don't initially understand what they're looking at.
 
-As they scroll, they slowly discover:
+As they scroll, they slowly discover how it was made:
 
-• the stained glass
-• the tracery
-• the arches
-• the vaults
-• the columns
-• the nave
-• the flying buttresses
-• the complete cathedral
+• the rose and its tracery
+• the pointed arch
+• the clustered pier
+• the clerestory
+• the rib vault
 
 Every reveal should answer a question while introducing a new one.
 
@@ -122,106 +135,91 @@ Every reveal should answer a question while introducing a new one.
 
 Scene 1
 
-Rose Window
+The Rose Window
 
 Question:
 
 "What am I looking at?"
 
-↓
-
-Scene 2
-
-Tracery
+The south rose of Notre-Dame is set out ring by ring: the centre, the twelve lights, the doubling to twenty-four.
 
 "How can stone become something so delicate?"
 
 ↓
 
-Scene 3
+The rose melts. Its lines are the same lines, and they land as the next drawing.
 
-Pointed Arch
+↓
+
+Scene 2
+
+The Pointed Arch
 
 "Why aren't these arches round?"
 
+Two arcs, each struck from the opposite side. The string course, the clustered pier, the clerestory lancets under the rose.
+
 ↓
 
-Scene 4
+The arches melt and land as the next drawing.
 
-Rib Vault
+↓
+
+Scene 3
+
+The Rib Vault
 
 "How can this ceiling stay standing?"
 
-↓
-
-Scene 5
-
-Columns
-
-"Where does all the weight go?"
-
-↓
-
-Scene 6
-
-Flying Buttresses
-
-"How can walls become almost entirely glass?"
-
-↓
-
-Scene 7
-
-Entire Cathedral
-
-Everything connects.
+A nave of bays in perspective. Two diagonal ribs, four pointed arches, a thin shell between. The weight runs down the ribs into the piers, and the walls are free to become glass.
 
 The visitor understands the engineering.
 
+*Still to come: columns, flying buttresses, the whole cathedral. If they are added, they are drawn the same way and the same lines carry over.*
+
 ---
 
-# Camera Direction
+# Transitions
 
-Camera movement should resemble a professional cinema dolly.
+One drawing does not cut to the next. Its lines melt and land as the next.
+
+The visitor should never feel a cut, only that the same marks have found a new meaning.
+
+---
+
+# Movement
+
+Everything is a pure function of scroll.
+
+Scrolling forward and back must be seamless. No one-way animation, no triggers, no timers.
+
+The visitor controls the pace entirely.
+
+Every movement should feel heavy and deliberate.
 
 Never:
 
 - snap
-- rotate suddenly
+- bounce
 - accelerate quickly
 
 Always:
 
 - smooth easing
-- gentle curves
 - slow reveals
 - deliberate framing
 
-The camera should never feel controlled by software.
-
-It should feel operated by an experienced cinematographer.
-
-Reference:
-
-Roger Deakins
-
-Denis Villeneuve
-
-Architectural visualization
+Even the vault's change of viewpoint is part of the drawing: it should feel like a patient draughtsman turning the sheet, not a software camera.
 
 ---
 
 # Visual Style
 
-Target realism:
+True geometry.
 
-90%
+The drawing must be right: true arcs, correct proportions, real construction.
 
-Stylization:
-
-10%
-
-The experience should look believable rather than artistic.
+Stylization is limited to the nature of drawing itself: line weights, ghost guides, a few quiet marks.
 
 ---
 
@@ -229,9 +227,9 @@ The experience should look believable rather than artistic.
 
 Primary:
 
-Sainte-Chapelle
+Notre-Dame de Paris (the south rose)
 
-Notre-Dame de Paris
+Sainte-Chapelle
 
 Amiens Cathedral
 
@@ -247,111 +245,39 @@ Every architectural element should be inspired by real Gothic structures.
 
 ---
 
-# Materials
+# Colour and Line
 
-Stone
+A dark ground, almost black, warm.
 
-French limestone
+Ink the colour of old chalk or silverpoint: a pale warm cream.
 
-Slight beige
+Guide lines in a dimmer, browner tone, dashed.
 
-Visible erosion
+Stone shapes in a barely lighter fill than the ground.
 
-Tiny cracks
+That is the whole palette.
 
-Soft chipped edges
+Never glossy. Never neon. Never saturated.
 
-High roughness
-
-Low reflectivity
-
-Never glossy.
-
-Never perfectly clean.
-
-Wood
-
-Dark oak
-
-Old
-
-Subtle wear
-
-Iron
-
-Forged
-
-Oxidized
-
-Handmade
-
-Glass
-
-Deep reds
-
-Cobalt blue
-
-Emerald green
-
-Golden highlights
-
-Light should pass through glass naturally.
-
-Never glowing.
-
----
-
-# Lighting
-
-Lighting is the most important visual element.
-
-Primary light:
-
-Late afternoon sun.
-
-Warm golden color.
-
-Secondary:
-
-Cool blue ambient bounce.
-
-Strong volumetric rays.
-
-Dust visible inside the beams.
-
-Corners remain dark.
-
-High dynamic range.
-
-Contrast is desirable.
-
-Never evenly lit.
-
-Never flat.
+Light, the cathedral's great subject, is implied by what the drawing shows: the glazing, the open walls, the narrow lancets. Colour belongs to the glass, which the words describe and the drawing leaves empty.
 
 ---
 
 # Atmosphere
 
-The cathedral should feel alive.
+The drawing should feel quiet and unhurried.
 
-Subtle floating dust.
+Large areas of empty ground.
 
-Very light fog.
+Nothing decorative that does not belong to the geometry.
 
-Soft ambient air movement.
-
-Tiny particles.
-
-No obvious particle effects.
-
-Everything should remain understated.
+Everything remains understated.
 
 ---
 
 # Audio
 
-Minimal.
+Minimal, if used at all.
 
 Almost silent.
 
@@ -369,31 +295,17 @@ Silence is part of the atmosphere.
 
 ---
 
-# Motion
-
-Every movement should feel heavy.
-
-Stone has weight.
-
-Buildings have weight.
-
-The camera should respect that.
-
-Nothing moves quickly.
-
----
-
 # Scroll Behaviour
 
-Scrolling is walking.
+Scrolling is drawing.
 
 Not zooming.
 
-Not animation.
+Not playing a video.
 
-Walking.
+Each notch of the wheel puts a few more lines on the sheet.
 
-The visitor progresses naturally through the cathedral.
+The visitor progresses naturally through the building, one drawing at a time.
 
 ---
 
@@ -451,25 +363,27 @@ Better:
 
 Teach through wonder.
 
+Section copy lives in `src/content/sections.ts` and can be replaced without touching code.
+
 ---
 
 # Technical Direction
 
+SVG, drawn in code. No images, no models, no WebGL.
+
 Prioritize:
 
-Performance
-
-Lighting
+Geometry
 
 Composition
 
-Camera
+Line weight
 
-Materials
+Timing against scroll
 
 Visual storytelling
 
-Do not add complexity unless it improves immersion.
+Do not add complexity unless it improves the drawing.
 
 ---
 
@@ -477,15 +391,9 @@ Do not add complexity unless it improves immersion.
 
 Target:
 
-60 FPS desktop
+Smooth scrolling on a laptop.
 
-30+ FPS laptop
-
-Fast loading.
-
-Compressed assets.
-
-Lazy loading where appropriate.
+Fast loading, with nothing to download but the page itself.
 
 ---
 
@@ -495,23 +403,17 @@ Do not create fantasy castles.
 
 Do not exaggerate Gothic proportions.
 
-Do not use unrealistic materials.
+Do not fake the geometry. If an arc is not a true arc, it is wrong.
 
-Do not overuse bloom.
-
-Do not overuse fog.
-
-Do not overuse particles.
+Do not add textures, gradients or glow to imitate realism.
 
 Do not use saturated neon colors.
 
 Do not use game UI.
 
-Do not use obvious procedural textures.
-
 Do not create visual clutter.
 
-Do not add interactions that interrupt immersion.
+Do not add interactions that interrupt the drawing.
 
 ---
 
