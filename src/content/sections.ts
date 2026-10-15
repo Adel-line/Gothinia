@@ -68,3 +68,18 @@ export const vaultSection: SectionContent = {
     'into four piers, and the walls between them are free to become glass.',
   calloutLabels: [],
 }
+
+/** The drawn version's fourth scene (the flying buttress and the gargoyle); the 3D scenes don't use it. */
+export const gargoyleSection: SectionContent = {
+  id: 'gargoyle',
+  kicker: 'Gothic structure · from c. 1200',
+  title: 'The Gargoyle',
+  body:
+    'The vault pushes outward, and a flying arch carries that thrust over the ' +
+    'aisle roof to a buttress pier, weighted by its pinnacle. The same stone ' +
+    'carries the rain. A channel runs along the top of the arch to a spout ' +
+    'carved from the pier, and the spout is the gargoyle: from the old French ' +
+    'for throat. It throws the water clear of the wall, because water running ' +
+    'down mortar undoes a building. Its face is a mason\'s joke, made useful.',
+  calloutLabels: [],
+}

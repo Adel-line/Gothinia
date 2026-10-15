@@ -1,5 +1,5 @@
 import './svg.css'
-import { sections, vaultSection } from '../content/sections'
+import { gargoyleSection, sections, vaultSection } from '../content/sections'
 import {
   ORDERS,
   PLATE_R,
@@ -26,6 +26,7 @@ import { buildSwarm } from './swarm'
 import { glassPane, glowColour, lancetSpec, rosePaneSpec, paneGeoFromPoints, setFx } from './glass'
 import type { View } from './swarm'
 import { buildVaultScene } from './vaultScene'
+import { buildGargoyleScene } from './gargoyleScene'
 
 /**
  * Prototype: Gothic architecture as a mason's drawing brought to life.
@@ -50,10 +51,15 @@ import { buildVaultScene } from './vaultScene'
 // (its own timeline is P / 0.46), its text holds to 0.5; the lines melt and
 // reform 0.535 → 0.67; scene 2 runs 0.68 → 1. The page's progress G (0 → 1)
 // covers those over 0 → G_A, then the arches melt into the vault, scene 3.
-const G_A = 0.58
-const T2_START = 0.615 // the arches begin to melt
-const T2_END = 0.775 // …and have landed as the vault
-const S3_START = 0.765 // scene 3's own timeline runs from here to 1
+const GS = 0.74 // scenes 1–3 take this share of the page; the rest is scene 4
+const G_A = 0.58 * GS
+const T2_START = 0.615 * GS // the arches begin to melt
+const T2_END = 0.775 * GS // …and have landed as the vault
+const S3_START = 0.765 * GS // scene 3's own timeline runs from here to GS
+// the vault melts into scene 4, the flying buttress and gargoyle; its own timeline runs S4_START → 1
+const T3_START = GS + 0.012
+const T3_END = GS + 0.1
+const S4_START = GS + 0.09
 const S1 = 0.46
 const S2_START = 0.68
 // the rose's lines break apart and reform as the arches between these
@@ -195,15 +201,34 @@ const ARCH_END = archShot(-380, -175, ROUND_X + 170, 268)
 const VAULT: Shot = { cx: 0, cy: -40, w: 1000, h: 640 }
 const SHOTS3: [number, Shot][] = [
   [T2_START, ARCH_END],
-  [(T2_START + T2_END) / 2 + 0.01, zoomed(ARCH_END, 1.7)],
-  [T2_END + 0.01, VAULT],
-  [0.93, VAULT],
+  [(T2_START + T2_END) / 2 + 0.01 * GS, zoomed(ARCH_END, 1.7)],
+  [T2_END + 0.01 * GS, VAULT],
+  [0.93 * GS, VAULT],
   // make room for the text on the left
-  [1.0, { ...VAULT, cx: -150 }],
+  [GS, { ...VAULT, cx: -150 }],
+]
+// scene 4: the vault's last shot, a breath out while it melts, then the buttress
+// wide, close on the gargoyle, and wide again to follow the water to the ground
+const GP = { x: -100, y: 221, k: 0.8 } // the buttress's centre sits at the drawing's origin
+const gShot = (x0: number, y0: number, x1: number, y1: number): Shot => ({
+  cx: GP.x + ((x0 + x1) / 2) * GP.k, cy: GP.y + ((y0 + y1) / 2) * GP.k, w: (x1 - x0) * GP.k, h: (y1 - y0) * GP.k,
+})
+const q4 = (q: number) => S4_START + q * (1 - S4_START) // scene-4 local → global
+const BUTTRESS = gShot(-260, -600, 480, 30)
+const BUTTRESS_TEXT = gShot(-520, -600, 480, 30)
+const SHOTS4: [number, Shot][] = [
+  [T3_START, { ...VAULT, cx: -150 }],
+  [(T3_START + T3_END) / 2, zoomed({ ...VAULT, cx: -150 }, 1.6)],
+  [T3_END + 0.006, BUTTRESS],
+  [q4(0.4), BUTTRESS],
+  [q4(0.52), gShot(150, -430, 440, -150)], // close on the gargoyle
+  [q4(0.7), gShot(150, -430, 440, -150)],
+  [q4(0.82), BUTTRESS_TEXT],
+  [1.0, BUTTRESS_TEXT],
 ]
 // one monotone cubic per channel through every shot: the dolly keeps a
 // continuous velocity through the waypoints and only comes to rest on a hold
-const ALL_SHOTS: [number, Shot][] = [...SHOTS, ...SHOTS2].map(([p, sh]) => [p * G_A, sh] as [number, Shot]).concat(SHOTS3)
+const ALL_SHOTS: [number, Shot][] = [...SHOTS, ...SHOTS2].map(([p, sh]) => [p * G_A, sh] as [number, Shot]).concat(SHOTS3, SHOTS4)
 const keys = ALL_SHOTS.map(([p]) => p)
 const camCx = monotone(keys, ALL_SHOTS.map(([, s]) => s.cx))
 const camCy = monotone(keys, ALL_SHOTS.map(([, s]) => s.cy))
@@ -224,6 +249,7 @@ function viewAt(g: number): View {
 
 // ---- scene 3 and the two swarms -----------------------------------------------------
 const vault = buildVaultScene(svg, defs)
+const garg = buildGargoyleScene(svg, GP)
 /**
  * Every pane of glass (about a hundred and fifty, each a stack of layers) is
  * built after the first paint, a few at a time, since none is visible until the
@@ -277,6 +303,7 @@ let glassReady = false
 type Swarm = Awaited<ReturnType<typeof buildSwarm>>
 let swarm1: Swarm | undefined
 let swarm2: Swarm | undefined
+let swarm3: Swarm | undefined
 setTimeout(async () => {
   await buildGlass()
   // the rose's lines melt and land as the arches…
@@ -297,6 +324,9 @@ setTimeout(async () => {
   // …and the arches' lines melt and land as the vault
   swarm2 = await buildSwarm(svg, arch.sources, vault.targets(), viewAt(T2_START), { seed: 13 })
   redraw()
+  // …and the vault's lines melt and land as the buttress
+  swarm3 = await buildSwarm(svg, vault.sources(), garg.targets, viewAt(T3_START), { seed: 29 })
+  redraw()
 }, 0)
 
 // ---- overlay ------------------------------------------------------------------------
@@ -309,9 +339,9 @@ const panelHtml = (c: (typeof sections)[number]) => `
   </div>`
 overlay.innerHTML =
   `<div class="intro"><div class="kicker">Gothinia</div><div class="cue">Scroll to draw</div></div>` +
-  panelHtml(sections[0]) + panelHtml(sections[1]) + panelHtml(vaultSection)
+  panelHtml(sections[0]) + panelHtml(sections[1]) + panelHtml(vaultSection) + panelHtml(gargoyleSection)
 const intro = overlay.querySelector<HTMLElement>('.intro')!
-const [panel, panel2, panel3] = overlay.querySelectorAll<HTMLElement>('.panel')
+const [panel, panel2, panel3, panel4] = overlay.querySelectorAll<HTMLElement>('.panel')
 const showPanel = (el: HTMLElement, v: number) => {
   el.style.opacity = String(v)
   el.style.transform = `translateY(calc(-50% + ${(1 - v) * 16}px))`
@@ -405,14 +435,21 @@ function render(G: number): void {
 
   // ---- transition 2 and scene 3 ---------------------------------------------
   swarm2?.update(ramp(G, T2_START, T2_END), view, out2 * (1 - ramp(G, T2_END - 0.02, T2_END)))
-  const q3 = ramp(G, S3_START, 1)
-  vault.update(q3, ramp(G, T2_END - 0.02, T2_END + 0.01), G * 1400)
+  const q3 = ramp(G, S3_START, GS)
+  const out3 = swarm3 ? ramp(G, T3_START, T3_START + 0.012) : G < T3_END ? 0 : 1
+  vault.update(q3, ramp(G, T2_END - 0.02, T2_END + 0.01), G * 1400, out3)
+
+  // ---- transition 3 and scene 4 ---------------------------------------------
+  swarm3?.update(ramp(G, T3_START, T3_END), view, out3 * (1 - ramp(G, T3_END - 0.02, T3_END)))
+  const q4s = ramp(G, S4_START, 1)
+  garg.update(q4s, ramp(G, T3_END - 0.02, T3_END + 0.01), G * 1400)
 
   // overlay
   intro.style.opacity = String(1 - ramp(p, 0.01, 0.05))
   showPanel(panel, ramp(p, 0.86, 0.93) * (1 - ramp(P, 0.48, 0.52)))
   showPanel(panel2, ramp(q, 0.86, 0.93) * (1 - ramp(G, T2_START - 0.03, T2_START)))
-  showPanel(panel3, ramp(q3, 0.84, 0.94))
+  showPanel(panel3, ramp(q3, 0.84, 0.94) * (1 - ramp(G, T3_START - 0.02, T3_START)))
+  showPanel(panel4, ramp(q4s, 0.84, 0.93))
 }
 
 // ---- scroll: a critically damped spring toward the scroll position -----------------

@@ -306,18 +306,33 @@ export function buildVaultScene(parent: Element, defs: Element) {
     return out.filter(Boolean)
   }
 
+  /** the vault's lines as they stand at the end of its walk: what the next swarm melts */
+  function sources(): string[] {
+    const end = pose(1)
+    const out: string[] = []
+    for (let k = 0; k < BAYS; k++) {
+      const zrel = geos[k].z0 + A - end.zc
+      if (zrel < -A || zrel > 1500) continue
+      const b = build(end, k, false)
+      out.push(b.ribs, b.walls, b.piers, b.boss)
+    }
+    return out.filter(Boolean)
+  }
+
   /**
    * q: scene progress 0..1; formed: 0..1 how far the landed swarm has been
-   * taken over by the drawn lines; flowPhase: how far the thrust has travelled.
+   * taken over by the drawn lines; flowPhase: how far the thrust has travelled;
+   * out: 0..1 leaving (fills and glass dim first, then the lines go to the swarm).
    */
-  function update(q: number, formed: number, flowPhase: number): void {
-    setOp(g, formed)
+  function update(q: number, formed: number, flowPhase: number, out = 0): void {
+    setOp(g, formed * (1 - ramp(out, 0.5, 1)))
+    const fills = 1 - ramp(out, 0, 0.5)
     const p = pose(q)
-    const stone = ease(ramp(q, 0.06, 0.2))
-    const courses = ease(ramp(q, 0.14, 0.3))
+    const stone = ease(ramp(q, 0.06, 0.2)) * fills
+    const courses = ease(ramp(q, 0.14, 0.3)) * fills
     const hi = ease(ramp(q, 0.3, 0.4)) * (1 - 0.6 * ramp(q, 0.7, 0.8))
-    const flows = ease(ramp(q, 0.38, 0.5)) * (1 - ramp(q, 0.66, 0.74))
-    const glass = ease(ramp(q, 0.68, 0.84))
+    const flows = ease(ramp(q, 0.38, 0.5)) * (1 - ramp(q, 0.66, 0.74)) * fills
+    const glass = ease(ramp(q, 0.68, 0.84)) * fills
     for (let k = 0; k < BAYS; k++) {
       const E = els[k]
       const G = geos[k]
@@ -348,5 +363,5 @@ export function buildVaultScene(parent: Element, defs: Element) {
     }
   }
 
-  return { update, targets }
+  return { update, targets, sources }
 }
