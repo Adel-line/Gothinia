@@ -324,6 +324,8 @@ interface BayGeo {
   wallLines: V3[][]
   piers: Pier[]
   platePolys: V3[][]
+  /** the triforium's wall: the plate over the arcade with its openings */
+  plateLow: V3[][]
   reveals: Reveal[]
   /** the stained glass of every window, at the back of the wall */
   glass: Glass3
@@ -402,6 +404,7 @@ function bayGeo(k: number): BayGeo {
   // the walls: arcade below, clerestory above the string course
   const wallLines: V3[][] = []
   const plates: V3[][] = []
+  const plateLow: V3[][] = []
   const reveals: Reveal[] = []
   const glass: Glass3 = { cobalt: [], ruby: [], lead: [], panes: [] }
   /** glaze an opening: its outline drawn in by the splay, at the back of a wall `depth` thick */
@@ -417,14 +420,14 @@ function bayGeo(k: number): BayGeo {
     wallLines.push(onWall(s, aw))
     reveals.push(reveal(s, zm, aw, DEPTH.arcade, SPLAY.arcade, false))
     // the wall over the arcade, up to the clerestory sill: solid, pierced by the triforium
-    plates.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, ARCADE_SPRING], ...aw, [A - PIER, ARCADE_SPRING], [A - PIER, SILL]]))
+    plateLow.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, ARCADE_SPRING], ...aw, [A - PIER, ARCADE_SPRING], [A - PIER, SILL]]))
     // triforium: a string course, then five pointed openings on colonnettes
     wallLines.push(onWall(s, [[-A + PIER, TRI_SILL], [A - PIER, TRI_SILL]]))
     const tw = (2 * (A - PIER) - (TRI_N + 1) * TRI_PIER) / TRI_N
     for (let i = 0; i < TRI_N; i++) {
       const uc = -A + PIER + TRI_PIER + tw / 2 + i * (tw + TRI_PIER)
       const t = lancet(uc, tw, TRI_SILL, TRI_SPRING)
-      plates.push(onWall(s, t))
+      plateLow.push(onWall(s, t))
       wallLines.push(onWall(s, [...t, t[0]]))
       reveals.push(reveal(s, zm, t, DEPTH.triforium, SPLAY.triforium, true))
       glaze(s, t, DEPTH.triforium, SPLAY.triforium, 5)
@@ -461,7 +464,7 @@ function bayGeo(k: number): BayGeo {
   }
   return {
     z0, transverseS, transverseN, wallW, wallE, d1, d2, cells, courses, boss, ribs, wallLines, piers,
-    platePolys: plates, reveals, glass, flow,
+    platePolys: plates, plateLow, reveals, glass, flow,
   }
 }
 
@@ -539,7 +542,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
 
   interface BayEls {
     g: SVGGElement
-    webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement
+    webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement; plateLow: SVGPathElement
     /** the stained glass: ground, border, leading, and a sheen on each pane */
     glass: { cobalt: SVGPathElement; ruby: SVGPathElement; lead: SVGPathElement; panes: SVGPathElement[] }
     /** the openings' reveals: each its faces and its edges, clipped to its own opening */
@@ -569,7 +572,11 @@ export function buildVaultScene(parent: Element, defs: Element) {
     const mk = (cls: string, extra: Record<string, string | number> = {}) => el('path', { class: cls, ...extra }, bg)
     els[k] = {
       g: bg,
-      webA: mk('stone a'), webB: mk('stone b'),
+      // the panels are tinted so each plane of the vault reads on its own: the
+      // webbing in warm sandstone, alternating from bay to bay, the triforium wall
+      // a shade lighter than the clerestory above it
+      webA: mk('stone a', { style: `fill:${k % 2 ? '#2d2418' : '#1b160f'}` }),
+      webB: mk('stone b', { style: `fill:${k % 2 ? '#1b160f' : '#2d2418'}` }),
       // through the openings: the glass at the back of the wall, then the reveals, then the wall's face
       glass: {
         cobalt: mk('', { fill: GLASS.cobalt }), ruby: mk('', { fill: GLASS.ruby, 'fill-rule': 'evenodd' }), lead: mk('lead'),
@@ -582,7 +589,8 @@ export function buildVaultScene(parent: Element, defs: Element) {
         const clip = { 'clip-path': `url(#${id})` }
         return [mk('rib-soffit', clip), mk('ink fine fadeout', clip), win] as [SVGPathElement, SVGPathElement, SVGPathElement]
       }),
-      plate: mk('stone b', { 'fill-rule': 'evenodd' }),
+      plateLow: mk('stone b', { 'fill-rule': 'evenodd', style: 'fill:#251d14' }),
+      plate: mk('stone b', { 'fill-rule': 'evenodd', style: 'fill:#15120e' }),
       courses: mk('ink faint2'), walls: mk('ink fine fadeout'),
       ...ribEls(geos[k].ribs.length, mk),
       bossFill: mk('rib-soffit'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
@@ -677,6 +685,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       webA: P.poly(G.cells[0]) + P.poly(G.cells[1]),
       webB: P.poly(G.cells[2]) + P.poly(G.cells[3]),
       plate: G.platePolys.map((q) => P.poly(q)).join(''),
+      plateLow: G.plateLow.map((q) => P.poly(q)).join(''),
       glass: {
         cobalt: G.glass.cobalt.map((q) => P.poly(q)).join(''),
         ruby: G.glass.ruby.map((q) => P.poly(q)).join(''),
@@ -737,7 +746,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
         const cur = e.getAttribute('d')
         if (cur !== (d ?? '')) e.setAttribute('d', d ?? '')
       }
-      set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate)
+      set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate); set(E.plateLow, b.plateLow)
       if (b.glass) {
         set(E.glass.cobalt, b.glass.cobalt); set(E.glass.ruby, b.glass.ruby); set(E.glass.lead, b.glass.lead)
         E.glass.panes.forEach((e, i) => set(e, b.glass?.panes[i]))
@@ -763,7 +772,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
         e.style.fill = pierFill
       })
       for (let i = b.pieces.length; i < pierPaths[k].length; i++) pierPaths[k][i].setAttribute('d', '')
-      setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone)
+      setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone); setOp(E.plateLow, stone)
       setOp(E.walls, atm); setOp(E.boss, atm); setOp(E.bossFill, stone)
       setOp(E.courses, courses * atm * near)
       setOp(E.ribHi, hi * atm)
