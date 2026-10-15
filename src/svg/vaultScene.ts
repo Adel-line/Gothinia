@@ -1,5 +1,4 @@
 import { ease, ease5, el, lerp, ramp, setOp } from './dom'
-import { multifoil } from './rose'
 
 /**
  * Scene 3 — the rib vault.
@@ -36,7 +35,7 @@ const NEAR = 14
 const PIER = 6 // half-width of a pier
 const PIER_CAP = 9 // half-width of the capital
 
-const GLASS = { cobalt: '#1d3a9e', ruby: '#9c1a24', gold: '#c98a22' }
+const GLASS = { cobalt: '#1d3a9e', ruby: '#9c1a24' }
 
 // ---- curves -------------------------------------------------------------------
 /** A pointed arch of half-span s: arcs of radius 1.5 s struck from ±s/2 about the axis. Points (x, y). */
@@ -287,19 +286,19 @@ function clipToConvex(poly: [number, number][], p: [number, number], q: [number,
 
 /**
  * Stained glass for a light, as in the arch scene: a cobalt ground leaded in
- * diamond quarries, a ruby border, and a medallion at the heart (a gold ring
- * round ruby, a cobalt quatrefoil, a gold boss). Each layer is a list of
- * outlines in the plane of the glass; `lead` is the leading, as lines.
+ * diamond quarries inside a ruby border. Each layer is a list of outlines in
+ * the plane of the glass; `lead` is the leading, as lines, and `panes` the
+ * lights themselves (each takes its own sheen).
  */
-interface Glass { cobalt: P2[][]; ruby: P2[][]; gold: P2[][]; disc: P2[][]; foil: P2[][]; boss: P2[][]; lead: P2[][] }
+interface Glass { cobalt: P2[][]; ruby: P2[][]; lead: P2[][]; panes: P2[][] }
 type P2 = [number, number]
 type Glass3 = Record<keyof Glass, V3[][]>
-function stainedGlass(out: P2[], mid: P2, rMed: number): Glass {
-  const border = Math.min(3, rMed * 0.35)
-  const inner = inset(out, border)
-  const lead: P2[][] = [[...out, out[0]], [...inner, inner[0]]]
+function stainedGlass(out: P2[], step: number): Glass {
+  const n = out.length
+  const mid: P2 = [out.reduce((a, [u]) => a + u / n, 0), out.reduce((a, [, y]) => a + y / n, 0)]
+  const inner = inset(out, step * 0.5)
+  const lead: P2[][] = [[...inner, inner[0]]]
   // the quarries: two families of diagonals, clipped to the field inside the border
-  const step = 5.5
   for (const dir of [1, -1]) {
     for (let c = -120; c <= 120; c += step) {
       const p: P2 = [mid[0] + c - 80 * dir, mid[1] - 80], q: P2 = [mid[0] + c + 80 * dir, mid[1] + 80]
@@ -307,12 +306,7 @@ function stainedGlass(out: P2[], mid: P2, rMed: number): Glass {
       if (seg) lead.push(seg)
     }
   }
-  const ring = circle2(mid[0], mid[1], rMed, 28)
-  const disc = circle2(mid[0], mid[1], rMed * 0.82, 28)
-  const foil = multifoil(mid, 4, rMed * 0.3, rMed * 0.33, Math.PI / 4)
-  const boss = circle2(mid[0], mid[1], rMed * 0.12, 12)
-  for (const o of [ring, disc, foil, boss]) lead.push([...o, o[0]])
-  return { cobalt: [out], ruby: [out, inner], gold: [ring], disc: [disc], foil: [foil], boss: [boss], lead }
+  return { cobalt: [out], ruby: [out, inner], lead, panes: [out] }
 }
 
 interface BayGeo {
@@ -330,10 +324,9 @@ interface BayGeo {
   wallLines: V3[][]
   piers: Pier[]
   platePolys: V3[][]
-  lancets: V3[][][] // per side: lancet glass, at the back of the wall
   reveals: Reveal[]
-  triGlass: Glass3
-  oculi: V3[][]
+  /** the stained glass of every window, at the back of the wall */
+  glass: Glass3
   flow: V3[][]
 }
 
@@ -409,12 +402,16 @@ function bayGeo(k: number): BayGeo {
   // the walls: arcade below, clerestory above the string course
   const wallLines: V3[][] = []
   const plates: V3[][] = []
-  const lancets: V3[][][] = [[], []]
-  const oculi: V3[] [] = []
   const reveals: Reveal[] = []
-  const triGlass: Glass3 = { cobalt: [], ruby: [], gold: [], disc: [], foil: [], boss: [], lead: [] }
+  const glass: Glass3 = { cobalt: [], ruby: [], lead: [], panes: [] }
+  /** glaze an opening: its outline drawn in by the splay, at the back of a wall `depth` thick */
+  const glaze = (s: -1 | 1, pts: P2[], depth: number, splay: number, step: number) => {
+    const gl = stainedGlass(inset(pts, splay), step)
+    const back = (q: P2[]): V3[] => q.map(([u, y]) => [s * (A + depth), y, zm + u])
+    for (const key of Object.keys(glass) as (keyof Glass)[]) glass[key].push(...gl[key].map(back))
+  }
   const onWall = (s: -1 | 1, pts: [number, number][]): V3[] => pts.map(([u, y]) => [s * A, y, zm + u])
-  for (const [si, s] of ([-1, 1] as const).entries()) {
+  for (const s of [-1, 1] as const) {
     // the arcade: a pointed arch from capital to capital
     const aw = pointed(A - PIER - 2).map(([u, y]): [number, number] => [u, y + ARCADE_SPRING])
     wallLines.push(onWall(s, aw))
@@ -430,10 +427,7 @@ function bayGeo(k: number): BayGeo {
       plates.push(onWall(s, t))
       wallLines.push(onWall(s, [...t, t[0]]))
       reveals.push(reveal(s, zm, t, DEPTH.triforium, SPLAY.triforium, true))
-      // glazed, at the back of the wall
-      const gl = stainedGlass(inset(t, SPLAY.triforium), [uc, TRI_SPRING - 3], Math.min(9, tw / 2 - SPLAY.triforium - 4))
-      const back = (q: P2[]): V3[] => q.map(([u, y]) => [s * (A + DEPTH.triforium), y, zm + u])
-      for (const key of Object.keys(triGlass) as (keyof Glass)[]) triGlass[key].push(...gl[key].map(back))
+      glaze(s, t, DEPTH.triforium, SPLAY.triforium, 5)
     }
     // clerestory sill: two strings, the whole width of the bay between the piers
     wallLines.push(onWall(s, [[-A + PIER, SILL], [A - PIER, SILL]]), onWall(s, [[-A + PIER, SILL - 7], [A - PIER, SILL - 7]]))
@@ -446,14 +440,14 @@ function bayGeo(k: number): BayGeo {
     for (const uc of [-27, 27]) {
       const l = lancet(uc, 40, SILL, 6)
       const r = reveal(s, zm, l, DEPTH.clerestory, SPLAY.clerestory, true)
-      lancets[si].push(r.back)
+      glaze(s, l, DEPTH.clerestory, SPLAY.clerestory, 6.5)
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
       reveals.push(r)
     }
     const o = circle2(0, 88, 15)
     const ro = reveal(s, zm, o, DEPTH.clerestory, SPLAY.clerestory, true)
-    oculi.push(ro.back)
+    glaze(s, o, DEPTH.clerestory, SPLAY.clerestory, 6)
     plates.push(onWall(s, o))
     wallLines.push(onWall(s, [...o, o[0]]))
     reveals.push(ro)
@@ -467,7 +461,7 @@ function bayGeo(k: number): BayGeo {
   }
   return {
     z0, transverseS, transverseN, wallW, wallE, d1, d2, cells, courses, boss, ribs, wallLines, piers,
-    platePolys: plates, lancets, oculi, reveals, triGlass, flow,
+    platePolys: plates, reveals, glass, flow,
   }
 }
 
@@ -546,9 +540,8 @@ export function buildVaultScene(parent: Element, defs: Element) {
   interface BayEls {
     g: SVGGElement
     webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement
-    glassB: SVGPathElement; glassR: SVGPathElement
-    /** the triforium's stained glass, layer by layer */
-    tri: Record<keyof Glass, SVGPathElement>
+    /** the stained glass: ground, border, leading, and a sheen on each pane */
+    glass: { cobalt: SVGPathElement; ruby: SVGPathElement; lead: SVGPathElement; panes: SVGPathElement[] }
     /** the openings' reveals: each its faces and its edges, clipped to its own opening */
     revs: [SVGPathElement, SVGPathElement, SVGPathElement][]
     courses: SVGPathElement; walls: SVGPathElement
@@ -578,11 +571,9 @@ export function buildVaultScene(parent: Element, defs: Element) {
       g: bg,
       webA: mk('stone a'), webB: mk('stone b'),
       // through the openings: the glass at the back of the wall, then the reveals, then the wall's face
-      glassB: mk('', { fill: GLASS.cobalt }), glassR: mk('', { fill: GLASS.ruby }),
-      tri: {
-        cobalt: mk('', { fill: GLASS.cobalt }), ruby: mk('', { fill: GLASS.ruby, 'fill-rule': 'evenodd' }),
-        gold: mk('', { fill: GLASS.gold }), disc: mk('', { fill: GLASS.ruby }), foil: mk('', { fill: GLASS.cobalt }),
-        boss: mk('', { fill: GLASS.gold }), lead: mk('lead'),
+      glass: {
+        cobalt: mk('', { fill: GLASS.cobalt }), ruby: mk('', { fill: GLASS.ruby, 'fill-rule': 'evenodd' }), lead: mk('lead'),
+        panes: geos[k].glass.panes.map(() => mk('', { fill: 'url(#pane-light)' })),
       },
       // (the reveals' edges go under the face too: where a reveal runs on behind it, so do they)
       revs: geos[k].reveals.map((_, i) => {
@@ -686,9 +677,12 @@ export function buildVaultScene(parent: Element, defs: Element) {
       webA: P.poly(G.cells[0]) + P.poly(G.cells[1]),
       webB: P.poly(G.cells[2]) + P.poly(G.cells[3]),
       plate: G.platePolys.map((q) => P.poly(q)).join(''),
-      glassB: G.lancets.flat().filter((_, i) => i % 4 < 2).map((q) => P.poly(q)).join('') + G.oculi.map((q) => P.poly(q)).join(''),
-      glassR: G.lancets.flat().filter((_, i) => i % 4 >= 2).map((q) => P.poly(q)).join(''),
-      tri: Object.fromEntries(Object.entries(G.triGlass).map(([key, qs]) => [key, key === 'lead' ? join(qs) : qs.map((q) => P.poly(q)).join('')])) as Record<keyof Glass, string>,
+      glass: {
+        cobalt: G.glass.cobalt.map((q) => P.poly(q)).join(''),
+        ruby: G.glass.ruby.map((q) => P.poly(q)).join(''),
+        lead: join(G.glass.lead),
+        panes: G.glass.panes.map((q) => P.poly(q)),
+      },
       courses: join(G.courses),
       ribHi: join([G.ribs[2].roll, G.ribs[3].roll]),
       flow: join(G.flow),
@@ -744,8 +738,11 @@ export function buildVaultScene(parent: Element, defs: Element) {
         if (cur !== (d ?? '')) e.setAttribute('d', d ?? '')
       }
       set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate)
-      set(E.glassB, b.glassB); set(E.glassR, b.glassR)
-      for (const key of Object.keys(E.tri) as (keyof Glass)[]) { set(E.tri[key], b.tri?.[key]); setOp(E.tri[key], glass) }
+      if (b.glass) {
+        set(E.glass.cobalt, b.glass.cobalt); set(E.glass.ruby, b.glass.ruby); set(E.glass.lead, b.glass.lead)
+        E.glass.panes.forEach((e, i) => set(e, b.glass?.panes[i]))
+      }
+      for (const e of [E.glass.cobalt, E.glass.ruby, E.glass.lead, ...E.glass.panes]) setOp(e, glass)
       set(E.courses, b.courses); set(E.walls, b.walls)
       b.revs.forEach((r, i) => {
         const [fill, ink, win] = E.revs[i]
@@ -772,7 +769,6 @@ export function buildVaultScene(parent: Element, defs: Element) {
       setOp(E.ribHi, hi * atm)
       setOp(E.flow, flows * atm)
       E.flow.style.strokeDashoffset = String(-flowPhase)
-      setOp(E.glassB, glass); setOp(E.glassR, glass)
     }
   }
 
