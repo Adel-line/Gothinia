@@ -27,6 +27,9 @@ const BAY = 2 * A
 const FLOOR = 330 // springing to floor
 const CROWN = Math.SQRT2 * A // every crown reaches this height
 const BAYS = 9
+/** the far end of the nave sinks into darkness: how much of a bay still shows at depth z */
+const fogVis = (z: number) => Math.exp(-Math.max(0, z - 320) / 480)
+const GROUND = [0x0d, 0x0b, 0x09], PIER_STONE = [0x22, 0x1c, 0x16]
 const F = 470 // focal length, in drawing units
 const NEAR = 14
 const PIER = 6 // half-width of a pier
@@ -480,6 +483,8 @@ export function buildVaultScene(parent: Element, defs: Element) {
     /** per rib: its visible side, its soffit, and its ink */
     ribs: [SVGPathElement, SVGPathElement, SVGPathElement][]
     ribHi: SVGPathElement; bossFill: SVGPathElement; boss: SVGPathElement; flow: SVGPathElement
+    /** a veil of the ground colour over this bay and all beyond it */
+    veil: SVGRectElement
   }
   // the ribs in painting order: wall ribs, diagonals and the gilded roll on
   // them, then the transverse arches, which stand in front at the springers
@@ -513,6 +518,8 @@ export function buildVaultScene(parent: Element, defs: Element) {
       courses: mk('ink faint2'), walls: mk('ink fine fadeout'),
       ...ribEls(geos[k].ribs.length, mk),
       bossFill: mk('rib-soffit'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
+      // painted after the bay, so the veils over the far bays add up: fog
+      veil: el('rect', { x: -4000, y: -4000, width: 8000, height: 8000, fill: '#0d0b09', 'pointer-events': 'none' }, g),
     }
   }
   // the piers stand in front of everything a bay draws: their capitals hide the
@@ -637,7 +644,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       const G = geos[k]
       const zrel = G.z0 + A - p.zc
       const visible = formed > 0 && zrel > -A - 40 && zrel < 2200
-      for (const e of [E.g, pierG[k], E.flow]) {
+      for (const e of [E.g, E.veil, pierG[k], E.flow]) {
         const d = visible ? '' : 'none'
         if (e.style.display !== d) e.style.display = d
       }
@@ -645,6 +652,14 @@ export function buildVaultScene(parent: Element, defs: Element) {
       // atmosphere: distant bays recede. Only the ink fades; the stone stays
       // solid, so no bay is ever seen through another
       const atm = Math.max(0.12, Math.min(1, 1.25 - Math.max(0, zrel) / 1500))
+      // the veil over this bay thins the light by what is lost between it and the bay in front
+      const vis = fogVis(zrel), visFront = k === 0 ? 1 : fogVis(G.z0 - BAY + A - p.zc)
+      setOp(E.veil, 1 - vis / visFront)
+      // the piers stand above the veils, so their stone is darkened to match
+      const mix = PIER_STONE.map((c, i) => Math.round(c + (GROUND[i] - c) * (1 - vis)))
+      const pierFill = `rgb(${mix.join(',')})`
+      // the fine work (courses, the reveals' inner edges) is left out of the distance
+      const near = Math.max(0, Math.min(1, 1.6 - Math.max(0, zrel) / 600))
       const b = build(p, k, true)
       const set = (e: SVGPathElement, d: string | undefined) => {
         const cur = e.getAttribute('d')
@@ -656,7 +671,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       b.revs.forEach((r, i) => {
         const [fill, ink, win] = E.revs[i]
         set(fill, r.fill); set(ink, r.ink); set(win, r.win)
-        setOp(fill, stone); setOp(ink, atm)
+        setOp(fill, stone); setOp(ink, atm * near)
       })
       b.ribParts.forEach((r, i) => {
         const [side, soffit, ink] = E.ribs[i]
@@ -668,12 +683,13 @@ export function buildVaultScene(parent: Element, defs: Element) {
         const e = pierPath(k, i)
         if (e.getAttribute('d') !== d) e.setAttribute('d', d)
         e.setAttribute('fill-opacity', stone.toFixed(3))
-        e.setAttribute('stroke-opacity', atm.toFixed(3))
+        e.setAttribute('stroke-opacity', (atm * vis).toFixed(3))
+        e.style.fill = pierFill
       })
       for (let i = b.pieces.length; i < pierPaths[k].length; i++) pierPaths[k][i].setAttribute('d', '')
       setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone)
       setOp(E.walls, atm); setOp(E.boss, atm); setOp(E.bossFill, stone)
-      setOp(E.courses, courses * atm)
+      setOp(E.courses, courses * atm * near)
       setOp(E.ribHi, hi * atm)
       setOp(E.flow, flows * atm)
       E.flow.style.strokeDashoffset = String(-flowPhase)
