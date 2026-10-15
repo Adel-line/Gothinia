@@ -90,6 +90,9 @@ const SILL = -62 // clerestory sill
 const ARCADE_SPRING = -270
 const TRI_SILL = -130 // triforium sill, just over the arcade's crown
 const TRI_SPRING = -102 // where the triforium heads spring
+/** the height of a course and the length of a stone, in the wall's coursing */
+const COURSE = 18
+const STONE = 44
 const TRI_N = 4 // openings in each bay of the triforium
 const TRI_PIER = 12 // width of the stone between them
 /** how deep each kind of opening runs into the wall */
@@ -328,6 +331,8 @@ interface BayGeo {
   d2: V3[]
   cells: V3[][] // W, E, S, N
   courses: V3[][]
+  /** the coursing of the walls: faint bed and stagger joints on the wall faces */
+  bricks: V3[][]
   boss: V3[][]
   ribs: Rib[]
   wallLines: V3[][]
@@ -415,6 +420,7 @@ function bayGeo(k: number): BayGeo {
 
   // the walls: arcade below, clerestory above the string course
   const wallLines: V3[][] = []
+  const bricks: V3[][] = []
   const plates: V3[][] = []
   const plateLow: V3[][] = []
   const reveals: Reveal[] = []
@@ -427,6 +433,13 @@ function bayGeo(k: number): BayGeo {
   }
   const onWall = (s: -1 | 1, pts: [number, number][]): V3[] => pts.map(([u, y]) => [s * A, y, zm + u])
   for (const s of [-1, 1] as const) {
+    // the coursing: beds across the whole face between the piers, and stagger joints
+    // between them, half a stone out of step from one course to the next. The face's
+    // own outline and its openings trim them (see the clip on the bay's bricks).
+    for (let i = 0, y = ARCADE_SPRING; y < 150; i++, y += COURSE) {
+      bricks.push(onWall(s, [[-A + PIER, y], [A - PIER, y]]))
+      for (let u = -A + PIER + (i % 2 ? STONE / 2 : STONE); u < A - PIER; u += STONE) bricks.push(onWall(s, [[u, y], [u, y + COURSE]]))
+    }
     // the arcade: a pointed arch from capital to capital
     const aw = pointed(A - PIER - 2).map(([u, y]): [number, number] => [u, y + ARCADE_SPRING])
     wallLines.push(onWall(s, aw))
@@ -476,7 +489,7 @@ function bayGeo(k: number): BayGeo {
   }
   return {
     z0, transverseS, transverseN, wallW, wallE, d1, d2, cells, courses, boss, ribs, wallLines, piers,
-    platePolys: plates, plateLow, reveals, glass, flow,
+    platePolys: plates, plateLow, bricks, reveals, glass, flow,
   }
 }
 
@@ -560,6 +573,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
     /** the openings' reveals: each its faces and its edges, clipped to its own opening */
     revs: [SVGPathElement, SVGPathElement, SVGPathElement][]
     courses: SVGPathElement; walls: SVGPathElement
+    bricks: SVGPathElement; wallClip: [SVGPathElement, SVGPathElement]
     /** per rib: its visible side, its soffit, and its ink */
     ribs: [SVGPathElement, SVGPathElement, SVGPathElement][]
     ribHi: SVGPathElement; bossFill: SVGPathElement; boss: SVGPathElement; flow: SVGPathElement
@@ -603,6 +617,12 @@ export function buildVaultScene(parent: Element, defs: Element) {
       }),
       plateLow: mk('stone b', { 'fill-rule': 'evenodd', style: 'fill:#251d14' }),
       plate: mk('stone b', { 'fill-rule': 'evenodd', style: 'fill:#15120e' }),
+      // the coursing is trimmed to the stone of the wall: the plates, openings cut out
+      ...(() => {
+        const cp = el('clipPath', { id: `vault-wall-${k}` }, defs)
+        const wallClip = [el('path', { 'clip-rule': 'evenodd' }, cp), el('path', { 'clip-rule': 'evenodd' }, cp)] as [SVGPathElement, SVGPathElement]
+        return { wallClip, bricks: mk('ink faint2', { 'clip-path': `url(#vault-wall-${k})` }) }
+      })(),
       courses: mk('ink faint2'), walls: mk('ink fine fadeout'),
       ...ribEls(geos[k].ribs.length, mk),
       bossFill: mk('rib-soffit'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
@@ -698,6 +718,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       webB: P.poly(G.cells[2]) + P.poly(G.cells[3]),
       plate: G.platePolys.map((q) => P.poly(q)).join(''),
       plateLow: G.plateLow.map((q) => P.poly(q)).join(''),
+      bricks: join(G.bricks),
       glass: {
         cobalt: G.glass.cobalt.map((q) => P.poly(q)).join(''),
         ruby: G.glass.ruby.map((q) => P.poly(q)).join(''),
@@ -759,6 +780,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
         if (cur !== (d ?? '')) e.setAttribute('d', d ?? '')
       }
       set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate); set(E.plateLow, b.plateLow)
+      set(E.wallClip[0], b.plate); set(E.wallClip[1], b.plateLow); set(E.bricks, b.bricks)
       if (b.glass) {
         set(E.glass.cobalt, b.glass.cobalt); set(E.glass.ruby, b.glass.ruby); set(E.glass.lead, b.glass.lead)
         E.glass.panes.forEach((e, i) => set(e, b.glass?.panes[i]))
@@ -786,7 +808,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       for (let i = b.pieces.length; i < pierPaths[k].length; i++) pierPaths[k][i].setAttribute('d', '')
       setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone); setOp(E.plateLow, stone)
       setOp(E.walls, atm); setOp(E.boss, atm); setOp(E.bossFill, stone)
-      setOp(E.courses, courses * atm * near)
+      setOp(E.courses, courses * atm * near); setOp(E.bricks, courses * atm * near)
       setOp(E.ribHi, hi * atm)
       setOp(E.flow, flows * atm)
       E.flow.style.strokeDashoffset = String(-flowPhase)
