@@ -88,6 +88,10 @@ const ARCADE_SPRING = -270
 const TRI_SILL = -130 // triforium sill, just over the arcade's crown
 const TRI_SPRING = -102 // where the triforium heads spring
 const TRI_PIER = 5 // width of a triforium colonnette
+/** how deep each kind of opening runs into the wall */
+const DEPTH = { arcade: PIER_CAP, triforium: 10, clerestory: 10 }
+/** how far each opening narrows toward the glass */
+const SPLAY = { arcade: 0, triforium: 2, clerestory: 3 }
 
 /**
  * A pier as a stack of rings [half-width, height, engaged?], bottom to top.
@@ -188,6 +192,62 @@ const RIB_T = { w: 6, d: 9 }
 const RIB_D = { w: 4.5, d: 6.5 }
 const RIB_W = { w: 3, d: 4.5 }
 
+/**
+ * The depth of an opening: its outline on the face of the wall (x = ±A) run
+ * back through the wall's thickness, splayed so the opening narrows toward the
+ * glass. Each straight piece of the outline gives one face of the reveal, with
+ * its normal pointing into the opening, so only the faces turned toward the
+ * eye are painted. `order` is the line where the reveal steps back, a third of
+ * the way in.
+ */
+interface Reveal { quads: V3[][]; n: V3[]; front: V3[]; back: V3[]; order: V3[]; closed: boolean; corners: number[] }
+function reveal(s: -1 | 1, zm: number, pts: [number, number][], depth: number, splay: number, closed: boolean): Reveal {
+  const N = pts.length
+  const cu = pts.reduce((a, [u]) => a + u / N, 0), cy = pts.reduce((a, [, y]) => a + y / N, 0)
+  // each segment's normal in the wall, pointing into the opening
+  const segN = (i: number): [number, number] => {
+    const j = (i + 1) % N
+    const du = pts[j][0] - pts[i][0], dy = pts[j][1] - pts[i][1]
+    const l = Math.hypot(du, dy) || 1
+    let nu = -dy / l, ny = du / l
+    const mu = (pts[i][0] + pts[j][0]) / 2, my = (pts[i][1] + pts[j][1]) / 2
+    if (nu * (cu - mu) + ny * (cy - my) < 0) { nu = -nu; ny = -ny }
+    return [nu, ny]
+  }
+  // at each point, the direction the splay draws it in: the mitre of its two segments
+  const ptN = pts.map((_, i): [number, number] => {
+    const has0 = closed || i > 0, has1 = closed || i < N - 1
+    const a = has0 ? segN((i - 1 + N) % N) : segN(i), b = has1 ? segN(i) : a
+    const mu = a[0] + b[0], my = a[1] + b[1]
+    const l = Math.hypot(mu, my) || 1
+    const k = 1 / Math.max(0.5, (mu / l) * a[0] + (my / l) * a[1]) // mitre length
+    return [(mu / l) * k, (my / l) * k]
+  })
+  const at = (f: number) => pts.map(([u, y], i): V3 => [s * (A + depth * f), y + ptN[i][1] * splay * f, zm + u + ptN[i][0] * splay * f])
+  const front = at(0), back = at(1), order = at(0.35)
+  const axis: V3 = [s * (A + depth / 2), cy, zm + cu]
+  const quads: V3[][] = [], n: V3[] = []
+  for (let i = 0; i < (closed ? N : N - 1); i++) {
+    const j = (i + 1) % N
+    const q = [front[i], front[j], back[j], back[i]]
+    const e1 = [q[1][0] - q[0][0], q[1][1] - q[0][1], q[1][2] - q[0][2]], e2 = [q[3][0] - q[0][0], q[3][1] - q[0][1], q[3][2] - q[0][2]]
+    let v: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]
+    const c = lerp3(q[0], q[2], 0.5)
+    if (v[0] * (axis[0] - c[0]) + v[1] * (axis[1] - c[1]) + v[2] * (axis[2] - c[2]) < 0) v = [-v[0], -v[1], -v[2]]
+    quads.push(q)
+    n.push(v)
+  }
+  // the sharp corners of the outline (a sill's ends, a head's apex), where the reveal has an arris
+  const corners: number[] = []
+  for (let i = closed ? 0 : 1; i < (closed ? N : N - 1); i++) {
+    const a = pts[(i - 1 + N) % N], b = pts[i], c = pts[(i + 1) % N]
+    const t1 = Math.atan2(b[1] - a[1], b[0] - a[0]), t2 = Math.atan2(c[1] - b[1], c[0] - b[0])
+    const turn = Math.abs(((t2 - t1 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI)
+    if (turn > 0.45) corners.push(i)
+  }
+  return { quads, n, front, back, order, closed, corners }
+}
+
 interface BayGeo {
   z0: number
   transverseS: V3[]
@@ -203,7 +263,8 @@ interface BayGeo {
   wallLines: V3[][]
   piers: Pier[]
   platePolys: V3[][]
-  lancets: V3[][][] // per side: lancet polygons
+  lancets: V3[][][] // per side: lancet glass, at the back of the wall
+  reveals: Reveal[]
   oculi: V3[][]
   flow: V3[][]
 }
@@ -282,11 +343,13 @@ function bayGeo(k: number): BayGeo {
   const plates: V3[][] = []
   const lancets: V3[][][] = [[], []]
   const oculi: V3[] [] = []
+  const reveals: Reveal[] = []
   const onWall = (s: -1 | 1, pts: [number, number][]): V3[] => pts.map(([u, y]) => [s * A, y, zm + u])
   for (const [si, s] of ([-1, 1] as const).entries()) {
     // the arcade: a pointed arch from capital to capital
     const aw = pointed(A - PIER - 2).map(([u, y]): [number, number] => [u, y + ARCADE_SPRING])
     wallLines.push(onWall(s, aw))
+    reveals.push(reveal(s, zm, aw, DEPTH.arcade, SPLAY.arcade, false))
     // the wall over the arcade, up to the clerestory sill: solid, pierced by the triforium
     plates.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, ARCADE_SPRING], ...aw, [A - PIER, ARCADE_SPRING], [A - PIER, SILL]]))
     // triforium: a string course, then five pointed openings on colonnettes
@@ -297,6 +360,7 @@ function bayGeo(k: number): BayGeo {
       const t = lancet(uc, tw, TRI_SILL, TRI_SPRING)
       plates.push(onWall(s, t))
       wallLines.push(onWall(s, [...t, t[0]]))
+      reveals.push(reveal(s, zm, t, DEPTH.triforium, SPLAY.triforium, true))
     }
     // clerestory sill: two strings, the whole width of the bay between the piers
     wallLines.push(onWall(s, [[-A + PIER, SILL], [A - PIER, SILL]]), onWall(s, [[-A + PIER, SILL - 7], [A - PIER, SILL - 7]]))
@@ -308,14 +372,18 @@ function bayGeo(k: number): BayGeo {
     for (const u of [-A + PIER, A - PIER]) wallLines.push(onWall(s, [[u, ARCADE_SPRING], [u, -12]]))
     for (const uc of [-27, 27]) {
       const l = lancet(uc, 40, SILL, 6)
-      lancets[si].push(onWall(s, l))
+      const r = reveal(s, zm, l, DEPTH.clerestory, SPLAY.clerestory, true)
+      lancets[si].push(r.back)
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
+      reveals.push(r)
     }
     const o = circle2(0, 88, 15)
-    oculi.push(onWall(s, o))
+    const ro = reveal(s, zm, o, DEPTH.clerestory, SPLAY.clerestory, true)
+    oculi.push(ro.back)
     plates.push(onWall(s, o))
     wallLines.push(onWall(s, [...o, o[0]]))
+    reveals.push(ro)
   }
 
   // the thrust: down each half-rib from the crown, then down the pier to the floor
@@ -326,7 +394,7 @@ function bayGeo(k: number): BayGeo {
   }
   return {
     z0, transverseS, transverseN, wallW, wallE, d1, d2, cells, courses, boss, ribs, wallLines, piers,
-    platePolys: plates, lancets, oculi, flow,
+    platePolys: plates, lancets, oculi, reveals, flow,
   }
 }
 
@@ -406,6 +474,8 @@ export function buildVaultScene(parent: Element, defs: Element) {
     g: SVGGElement
     webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement
     glassB: SVGPathElement; glassR: SVGPathElement
+    /** the openings' reveals: each its faces and its edges, clipped to its own opening */
+    revs: [SVGPathElement, SVGPathElement, SVGPathElement][]
     courses: SVGPathElement; walls: SVGPathElement
     /** per rib: its visible side, its soffit, and its ink */
     ribs: [SVGPathElement, SVGPathElement, SVGPathElement][]
@@ -430,8 +500,16 @@ export function buildVaultScene(parent: Element, defs: Element) {
     els[k] = {
       g: bg,
       webA: mk('stone a'), webB: mk('stone b'),
-      plate: mk('stone b', { 'fill-rule': 'evenodd' }),
+      // through the openings: the glass at the back of the wall, then the reveals, then the wall's face
       glassB: mk('', { fill: GLASS.cobalt }), glassR: mk('', { fill: GLASS.ruby }),
+      // (the reveals' edges go under the face too: where a reveal runs on behind it, so do they)
+      revs: geos[k].reveals.map((_, i) => {
+        const id = `vault-win-${k}-${i}`
+        const win = el('path', {}, el('clipPath', { id }, defs))
+        const clip = { 'clip-path': `url(#${id})` }
+        return [mk('rib-soffit', clip), mk('ink fine fadeout', clip), win] as [SVGPathElement, SVGPathElement, SVGPathElement]
+      }),
+      plate: mk('stone b', { 'fill-rule': 'evenodd' }),
       courses: mk('ink faint2'), walls: mk('ink fine fadeout'),
       ...ribEls(geos[k].ribs.length, mk),
       bossFill: mk('rib-soffit'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
@@ -470,13 +548,56 @@ export function buildVaultScene(parent: Element, defs: Element) {
       }
     })
     const ribs = ribParts.map((r) => r.ink).join('')
+    // the openings' reveals: the faces turned to the eye, and their edges.
+    // The back edge and the step of the order are drawn only along the faces
+    // that show; where the reveal turns out of sight its arris closes the run.
+    const revs = G.reveals.map((r) => {
+      const revFaces: string[] = []
+      const revInk: V3[][] = []
+      const vis = r.quads.map((q, i) => {
+        const c = lerp3(q[0], q[2], 0.5), n = r.n[i]
+        return n[0] * (eye[0] - c[0]) + n[1] * (eye[1] - c[1]) + n[2] * (eye[2] - c[2]) > 0
+      })
+      vis.forEach((v, i) => { if (v) revFaces.push(P.poly(r.quads[i])) })
+      const m = vis.length
+      // runs of visible faces, as [first face, count]; face i runs from point i to i + 1
+      const pts = r.front.length
+      const runs: [number, number][] = []
+      if (r.closed && vis.every(Boolean)) runs.push([0, m])
+      else {
+        for (let i = 0; i < m; i++) {
+          const before = r.closed ? vis[(i - 1 + m) % m] : i > 0 && vis[i - 1]
+          if (!vis[i] || before) continue
+          let n = 1
+          while (n < m && vis[(i + n) % m] && (r.closed || i + n < m)) n++
+          runs.push([i, n])
+        }
+      }
+      const pick = (line: V3[], i0: number, n: number) => Array.from({ length: n + 1 }, (_, k) => line[(i0 + k) % pts])
+      for (const [i0, n] of runs) {
+        revInk.push(pick(r.back, i0, n), pick(r.order, i0, n))
+        // each end of a run is closed by the reveal's edge there, front to back:
+        // an arris at a corner, the outline of the curve where it turns out of
+        // sight. Whatever of it runs on behind the face of the wall is covered by it.
+        if (n < m || !r.closed) {
+          for (const e of [i0, (i0 + n) % pts]) revInk.push([r.front[e], r.back[e]])
+        }
+      }
+      // an arris where two faces that both show meet at a corner
+      for (const i of r.corners) if (vis[i] && vis[(i - 1 + m) % m]) revInk.push([r.front[i], r.back[i]])
+      // only what shows through its own opening: the window it is seen through
+      const f = r.front
+      const win = r.closed ? f : [...f, [f[f.length - 1][0], -FLOOR, f[f.length - 1][2]] as V3, [f[0][0], -FLOOR, f[0][2]] as V3]
+      return { fill: revFaces.join(''), ink: join(revInk), win: P.poly(win) }
+    })
+    const revealInk = revs.map((r) => r.ink).join('')
     const walls = join(G.wallLines)
     const pieces = G.piers.flatMap((q) => pierPieces(q, p.ye, p.zc)).map((faces) => faces.map((f) => P.poly(f)).join(''))
     const piers = pieces.join('')
     const boss = join(G.boss)
-    if (!full) return { ribs, walls, piers, boss, pieces, ribParts }
+    if (!full) return { ribs, walls, piers, boss, pieces, ribParts, revs, revealInk }
     return {
-      ribs, walls, piers, boss, pieces, ribParts,
+      ribs, walls, piers, boss, pieces, ribParts, revs, revealInk,
       bossFill: P.poly(G.boss[0]),
       webA: P.poly(G.cells[0]) + P.poly(G.cells[1]),
       webB: P.poly(G.cells[2]) + P.poly(G.cells[3]),
@@ -494,7 +615,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
     const out: string[] = []
     for (let k = 0; k < BAYS; k++) {
       const b = build(POSE0, k, false)
-      out.push(b.ribs, b.walls, b.piers, b.boss)
+      out.push(b.ribs, b.walls, b.revealInk, b.piers, b.boss)
     }
     return out.filter(Boolean)
   }
@@ -532,6 +653,11 @@ export function buildVaultScene(parent: Element, defs: Element) {
       set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate)
       set(E.glassB, b.glassB); set(E.glassR, b.glassR)
       set(E.courses, b.courses); set(E.walls, b.walls)
+      b.revs.forEach((r, i) => {
+        const [fill, ink, win] = E.revs[i]
+        set(fill, r.fill); set(ink, r.ink); set(win, r.win)
+        setOp(fill, stone); setOp(ink, atm)
+      })
       b.ribParts.forEach((r, i) => {
         const [side, soffit, ink] = E.ribs[i]
         set(side, r.side); set(soffit, r.soffit); set(ink, r.ink)
