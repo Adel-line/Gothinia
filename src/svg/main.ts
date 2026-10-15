@@ -221,8 +221,8 @@ const SHOTS4: [number, Shot][] = [
   [(T3_START + T3_END) / 2, zoomed({ ...VAULT, cx: -150 }, 1.6)],
   [T3_END + 0.006, BUTTRESS],
   [q4(0.4), BUTTRESS],
-  [q4(0.52), gShot(150, -430, 440, -150)], // close on the gargoyle
-  [q4(0.7), gShot(150, -430, 440, -150)],
+  [q4(0.52), gShot(100, -440, 430, -170)], // close on the gargoyle
+  [q4(0.7), gShot(100, -440, 430, -170)],
   [q4(0.82), BUTTRESS_TEXT],
   [1.0, BUTTRESS_TEXT],
 ]

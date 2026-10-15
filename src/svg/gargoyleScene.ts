@@ -113,37 +113,44 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
   const finial = `M${P(175, -548)}V${Y(-562)}M${P(175, -552)}m${S(-4)} 0a${S(4)} ${S(4)} 0 1 0 ${S(8)} 0a${S(4)} ${S(4)} 0 1 0 ${S(-8)} 0`
 
   // ---- the gargoyle ---------------------------------------------------------------------
-  // a beast in profile, facing right, its neck rooted in the pier: horned, brow-ridged,
-  // jaws open (the water comes through them), forepaws gripping the corbel below
+  // A beast in profile, facing right, its neck rooted in the pier. Heavy brow, deep-set
+  // eye, a wrinkled snout and jaws wide open on fangs (the water runs through them),
+  // swept-back horns, a spined back, a folded bat wing rising behind it, and a clawed
+  // forelimb gripping the corbel below. (Absolute commands only: G() maps point pairs.)
   const garSilhouette = G(
-    'M0 -20C12 -26 24 -30 36 -26C42 -34 52 -36 60 -30C70 -26 80 -20 92 -14C98 -12 102 -6 98 -1L90 3' +
-      'L88 11L84 4L78 4L76 12L72 4L62 5L56 8L58 19L88 19C95 20 95 27 88 28L62 33C48 39 30 41 14 41L0 39Z',
+    'M0 -22C10 -30 22 -36 34 -36C40 -44 52 -48 62 -42C68 -40 72 -34 74 -30L80 -28' +
+      'C90 -26 102 -20 112 -14C118 -12 122 -6 120 0C120 2 117 4 113 4' +
+      'L112 9L108 3L104 3L102 15L99 3L94 4L92 10L88 5L82 6L78 5L70 8' +
+      'C70 14 72 20 76 22L82 21L84 14L88 22L94 21L97 12L100 22L108 22L111 17L116 25' +
+      'C118 29 114 33 108 33L80 41C66 47 50 51 36 53C26 55 14 53 0 49Z',
   )
-  const horn = G('M40 -29C42 -46 54 -57 68 -55C58 -50 52 -42 50 -29Z')
-  const ear = G('M27 -26L21 -45L38 -33Z')
-  const eye = `M${P(G_O[0] + 55, G_O[1] - 17)}m${S(-3.4)} 0a${S(3.4)} ${S(3.4)} 0 1 0 ${S(6.8)} 0a${S(3.4)} ${S(3.4)} 0 1 0 ${S(-6.8)} 0`
-  const brow = G('M46 -24C54 -30 64 -26 71 -21')
-  const nostril = G('M93 -8C95 -9 97 -7 96 -5')
-  const forelimb = G('M12 41C10 44 12 46 16 46L30 46C35 46 35 42 31 41M20 46L20 43M24 46L24 43M28 46L28 43')
-  const corbel = G('M-8 46L32 46L32 58L12 66L-8 58Z')
-  // scales along the neck and brow, ribs along the throat
-  let scales = ''
-  for (let i = 0; i < 6; i++) {
-    const x = 3 + i * 6.2, y = -21 - Math.sin(i / 1.4) * 4
-    scales += G(`M${x} ${y}Q${x + 3} ${y - 5} ${x + 6} ${y}`)
-  }
-  let hatch = ''
-  for (let i = 0; i < 6; i++) {
-    const x = 8 + i * 7.5, y = 37 - i * 0.2
-    hatch += G(`M${x} ${y}Q${x + 3} ${y - 7} ${x + 6} ${y - 1}`)
-  }
-  // the groove along its back, which takes the water from the channel to the mouth
-  // shadow under the brow, along the jaw and on the horn
-  let shade = ''
-  for (let i = 0; i < 5; i++) shade += G(`M${64 + i * 5} ${-24 + i * 2.4}L${67 + i * 5} ${-19 + i * 2.4}`)
-  for (let i = 0; i < 6; i++) shade += G(`M${60 + i * 6} ${31 - i * 0.7}L${57 + i * 6} ${24 - i * 0.7}`)
-  shade += G('M46 -32C48 -42 54 -50 62 -53M44 -30C46 -38 50 -44 56 -48')
-  const groove = G('M0 -15C12 -21 24 -25 36 -21C44 -27 52 -28 60 -23C70 -19 80 -13 90 -7')
+  const hornBack = G('M46 -40C36 -52 22 -60 6 -62C20 -54 32 -46 38 -36Z')
+  const hornFront = G('M56 -44C54 -56 58 -66 68 -72C64 -62 64 -52 64 -43Z')
+  // a folded bat wing, smaller and curved, scalloped between its bones
+  const wing = G('M8 -26C2 -44 0 -62 -4 -78C-14 -78 -22 -76 -26 -70Q-30 -58 -36 -48Q-30 -42 -24 -30Q-10 -34 8 -26Z')
+  const wingEdge = ''
+  const wingBones = G('M-4 -78L-26 -70M-4 -78L-36 -48M-4 -78L-24 -30M-4 -78C-6 -60 0 -42 8 -26')
+  const forelimb = G('M12 51C22 51 32 55 36 63M20 58C26 60 30 62 31 66')
+  const claws = G('M36 63C40 65 42 69 40 73M31 66C34 68 35 72 33 75M26 62C28 65 28 69 26 72M26 62L36 63')
+  const corbel = G('M-14 62L38 62L38 68L32 68L32 74L26 74L22 82L6 88L-8 82L-8 74L-14 74Z')
+  const corbelLeaf = G('M6 88C0 96 6 104 14 100C10 96 10 92 8 89')
+  // the face: eye socket, brow, wrinkles, nostril, cheek, tongue, spines
+  const eyeSocket = G('M62 -34C66 -40 76 -40 82 -33C76 -29 68 -29 62 -34Z')
+  const pupil = G('M72 -39L73 -30')
+  const browRidge = G('M54 -42C66 -40 80 -34 92 -24M58 -36C68 -34 80 -30 90 -22')
+  const wrinkles = G('M96 -22C99 -18 99 -14 96 -10M104 -18C107 -14 107 -10 104 -6M92 -25C94 -22 94 -19 92 -16')
+  const nostril = G('M110 -8C113 -10 116 -8 115 -5C112 -4 110 -5 110 -8Z')
+  const cheek = G('M60 -22C70 -14 74 -4 70 8')
+  const tongue = G('M74 22C90 18 104 24 116 31C118 33 121 35 124 34M116 31C119 28 123 27 126 28')
+  const spines = G('M4 -24L0 -33L9 -28M13 -30L10 -40L19 -34M22 -35L20 -46L29 -39M30 -38L30 -49L38 -42')
+  const beard = G('M96 31L91 41L100 32M84 36L79 46L88 37M72 40L66 50L76 42')
+  // pale glints, where light would catch: horns, brow, the fangs
+  const glints = G('M46 -40C36 -52 22 -60 6 -62M62 -42C68 -40 72 -34 74 -30M56 -44C54 -56 58 -66 68 -72M102 3L102 14M108 3L110 9M88 22L86 15M100 22L98 14')
+  // the groove along its back, which takes the water in through the neck
+  const groove = G('M0 -17C10 -25 22 -31 34 -31C38 -37 46 -40 52 -37')
+  // hatching in the shadows: under the brow, along the jaw, down the throat
+  let hatchD = ''
+  for (let x = -6; x < 130; x += 4.2) hatchD += G(`M${x} -12L${x - 14} 14`)
 
   // fills (stone), under the ink
   const fillA = el('path', { class: 'stone a', 'fill-rule': 'evenodd' }, gStone)
@@ -159,8 +166,38 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
       `M${P(PIER_X0 + 4, -470)}L${P(175, -548)}L${P(PIER_X1 - 4, -470)}Z` +
       `M${P(0, -262)}L${P(150, -178)}V${Y(-166)}L${P(0, -250)}Z` +
       '')
-  const fillG = el('path', { class: 'stone c' }, gGargFill)
-  fillG.setAttribute('d', garSilhouette + horn + ear + corbel)
+  // the beast: wing behind, then corbel and body, horns and forelimb on top
+  el('path', { class: 'stone d', d: wing }, gGargFill)
+  el('path', { class: 'stone b', d: corbel }, gGargFill)
+  el('path', { class: 'stone c', d: garSilhouette }, gGargFill)
+  el('path', { class: 'stone a', d: hornBack + hornFront }, gGargFill)
+  // light from the upper left, shadow under the jaw: a gradient and hatching, clipped to the body
+  const clipId = 'garg-clip'
+  el('clipPath', { id: clipId }, g).appendChild(el('path', { d: garSilhouette }))
+  const light = el('linearGradient', {
+    id: 'garg-light', gradientUnits: 'userSpaceOnUse', x1: X(G_O[0] + 14), y1: Y(G_O[1] - 52), x2: X(G_O[0] + 96), y2: Y(G_O[1] + 52),
+  }, g)
+  el('stop', { offset: 0, 'stop-color': '#d9c7a4', 'stop-opacity': 0.3 }, light)
+  el('stop', { offset: 0.5, 'stop-color': '#d9c7a4', 'stop-opacity': 0 }, light)
+  el('stop', { offset: 0.5, 'stop-color': '#000008', 'stop-opacity': 0 }, light)
+  el('stop', { offset: 1, 'stop-color': '#000008', 'stop-opacity': 0.55 }, light)
+  const shadow = el('linearGradient', {
+    id: 'garg-shadow', gradientUnits: 'userSpaceOnUse', x1: 0, y1: Y(G_O[1] + 8), x2: 0, y2: Y(G_O[1] + 52),
+  }, g)
+  el('stop', { offset: 0, 'stop-color': '#050509', 'stop-opacity': 0 }, shadow)
+  el('stop', { offset: 1, 'stop-color': '#050509', 'stop-opacity': 0.75 }, shadow)
+  const shaded = el('g', { 'clip-path': `url(#${clipId})`, opacity: 0 }, gGargFill)
+  el('path', { d: garSilhouette, fill: 'url(#garg-light)' }, shaded)
+  el('path', { d: hatchD, class: 'ink faint2', style: 'stroke:url(#garg-shadow);stroke-opacity:1' }, shaded)
+  // the eye: a socket, and a faint ember in it once the rain begins
+  el('path', { d: eyeSocket, fill: '#06060a' }, gGargFill)
+  el('path', { d: nostril, fill: '#06060a' }, gGargFill)
+  const ember = el('g', { opacity: 0 }, gGargFill)
+  const glow = el('radialGradient', { id: 'garg-ember' }, g)
+  el('stop', { offset: 0, 'stop-color': '#ffb040', 'stop-opacity': 0.9 }, glow)
+  el('stop', { offset: 1, 'stop-color': '#c04010', 'stop-opacity': 0 }, glow)
+  el('circle', { cx: X(G_O[0] + 72), cy: Y(G_O[1] - 34), r: S(6), fill: 'url(#garg-ember)' }, ember)
+  el('circle', { cx: X(G_O[0] + 72), cy: Y(G_O[1] - 34), r: S(1.5), fill: '#ffd070' }, ember)
 
   // ink, drawn on in turn
   const ink = (d: string, cls = 'fine', parent: Element = gInk) => drawn(d, cls, parent)
@@ -173,9 +210,11 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
   const inkJoints = ink(joints + channel, 'faint2')
   const inkCourses = ink(wallCourses + pierCourses + tiles + blind, 'faint2')
   const inkCrockets = ink(crockets)
-  const inkGarg = ink(garSilhouette + horn + ear + corbel, 'bold')
-  const inkGargDetail = ink(eye + brow + nostril + forelimb + groove, 'fine')
-  const inkScales = ink(scales + hatch + shade, 'faint2')
+  const inkGarg = ink(garSilhouette + hornBack + hornFront + corbel + forelimb + wing, 'bold')
+  const inkGargDetail = ink(eyeSocket + pupil + browRidge + wrinkles + nostril + cheek + tongue + spines + beard + claws + corbelLeaf + wingEdge + wingBones + groove, 'fine')
+  const inkGlints = ink(glints, 'fine')
+  inkGlints.style.stroke = '#f3e3c0'
+  inkGlints.style.strokeOpacity = '0.55'
   // the inside of the nave: the vault's rib, springing from the wall
   const rib = ink(`M${P(WALL_X0, -330)}A${S(84)} ${S(84)} 0 0 0 ${P(WALL_X0 - 84, -414)}M${P(WALL_X0, -330)}A${S(120)} ${S(70)} 0 0 0 ${P(WALL_X0 - 130, -392)}M${P(WALL_X0 - 8, -330)}H${X(WALL_X0 + 2)}`, 'fine')
 
@@ -184,7 +223,7 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
     ['Vault', WALL_X0 - 70, -372, 'middle'],
     ['Nave wall', WALL_X0 / 2, -200, 'middle'],
     ['Pinnacle', 218, -520, 'start'],
-    ['Gargoyle', 296, -282, 'start'],
+    ['Gargoyle', 340, -262, 'start'],
   ] as const
   const labelEls = labels.map(([text, x, y, anchor]) => {
     const t = el('text', { x: X(x), y: Y(y), class: 'label side', 'font-size': S(8.5), 'text-anchor': anchor, opacity: 0 }, gInk)
@@ -212,10 +251,10 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
   }
   const rain = el('path', { d: rainD, class: 'rain', opacity: 0, 'stroke-dasharray': `${S(7)} ${S(46)}` }, gWater)
   // the channel: water running down the top of the arch to the pier, into the gargoyle's groove
-  const spoutD = `M${P(2, topAt(2) + 0.5)}L${P(150, topAt(150) + 0.5)}L${P(G_O[0] + 2, G_O[1] - 14)}` + G('L36 -21L60 -23L90 -7L96 4L90 12')
+  const spoutD = `M${P(2, topAt(2) + 0.5)}L${P(150, topAt(150) + 0.5)}` + G('L0 -17L10 -25L22 -31L34 -31')
   const channelFlow = el('path', { d: spoutD, class: 'water', opacity: 0, 'stroke-dasharray': `${S(4)} ${S(5)}` }, gWater)
   // …and out of the mouth in a long parabola
-  const mouth: [number, number] = [G_O[0] + 90, G_O[1] + 12]
+  const mouth: [number, number] = [G_O[0] + 110, G_O[1] + 19]
   let stream = `M${P(mouth[0], mouth[1])}`
   const T = 2.2, vx = 46, grav = (2 * (0 - mouth[1])) / (T * T)
   for (let i = 1; i <= 30; i++) {
@@ -230,7 +269,7 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
   }, gWater)
 
   /** what the swarm lands on: the structure's outlines, in the order they draw */
-  const targets = [ground, wall + cornice + parapet, archTop + archUnder, pier + pierCap, roof, shaft + spireBase + spire, garSilhouette + horn + ear]
+  const targets = [ground, wall + cornice + parapet, archTop + archUnder, pier + pierCap, roof, shaft + spireBase + spire, garSilhouette + hornBack + hornFront + wing + corbel + forelimb]
 
   /**
    * q: this scene's own progress 0..1; formed: 0..1 how far the landed swarm has
@@ -240,6 +279,8 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
     setOp(g, formed)
     setOp(gStone, ramp(q, 0.08, 0.22))
     setOp(gGargFill, ramp(q, 0.46, 0.56))
+    setOp(shaded, ramp(q, 0.54, 0.64))
+    setOp(ember, ramp(q, 0.62, 0.7) * (0.75 + 0.25 * Math.sin(flowPhase * 0.11)))
     // the structure, from the ground up
     setDraw(inkGround, ease(ramp(q, 0.02, 0.1)))
     setDraw(inkWall, ease(ramp(q, 0.04, 0.16)))
@@ -261,7 +302,7 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
     // the gargoyle is carved
     setDraw(inkGarg, ease(ramp(q, 0.44, 0.54)))
     setDraw(inkGargDetail, ease(ramp(q, 0.5, 0.58)))
-    setDraw(inkScales, ease(ramp(q, 0.54, 0.62)))
+    setDraw(inkGlints, ease(ramp(q, 0.56, 0.64)))
     // rain, the channel, the spout
     setOp(rain, ramp(q, 0.58, 0.66) * 0.55)
     rain.style.strokeDashoffset = String(-flowPhase * k * 1.7)

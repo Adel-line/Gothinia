@@ -131,6 +131,9 @@ body {
 .stone.a {
   fill: #221c16;
 }
+.stone.d {
+  fill: #19140f;
+}
 .stone.c {
   fill: #2c241b;
 }
