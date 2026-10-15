@@ -36,7 +36,7 @@ const GLASS = { cobalt: '#1d3a9e', ruby: '#9c1a24' }
 
 // ---- curves -------------------------------------------------------------------
 /** A pointed arch of half-span s: arcs of radius 1.5 s struck from ±s/2 about the axis. Points (x, y). */
-function pointed(s: number, n = 18): [number, number][] {
+function pointed(s: number, n = 40): [number, number][] {
   const r = 1.5 * s
   const phiA = Math.acos(0.5 * s / r)
   const out: [number, number][] = []
@@ -53,7 +53,7 @@ function pointed(s: number, n = 18): [number, number][] {
 const ARCH = pointed(A)
 
 /** A semicircular rib over the plan chord p → q (peak height `h`). */
-function semi(p: V3, q: V3, h: number, n = 32): V3[] {
+function semi(p: V3, q: V3, h: number, n = 64): V3[] {
   const out: V3[] = []
   for (let i = 0; i <= n; i++) {
     const t = i / n
@@ -148,6 +148,46 @@ function pierPieces(pr: Pier, ye: number, zc: number): V3[][][] {
   return pieces.map((p) => p.faces)
 }
 
+/**
+ * A rib as solid stone: a band of width 2w hanging d below the web along its
+ * curve. The curve lies in a vertical plane with horizontal normal h; the
+ * soffit (the underside) is the curve moved d toward the arch's centre.
+ */
+interface Rib {
+  /** the edges of the soffit, its centre roll, and the two lines where the rib meets the web */
+  sA: V3[]; sB: V3[]; roll: V3[]; wA: V3[]; wB: V3[]
+  h: V3
+  mid: V3
+}
+function rib(curve: V3[], h: V3, w: number, d: number): Rib {
+  const n = curve.length
+  const a = curve[0], b = curve[n - 1]
+  const mid: V3 = [(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2]
+  const off = (p: V3, v: V3, k: number): V3 => [p[0] + v[0] * k, p[1] + v[1] * k, p[2] + v[2] * k]
+  // toward the arch's centre: in the rib's plane, square to the curve
+  const inward = curve.map((p, i) => {
+    const q0 = curve[Math.max(0, i - 1)], q1 = curve[Math.min(n - 1, i + 1)]
+    const t: V3 = [q1[0] - q0[0], q1[1] - q0[1], q1[2] - q0[2]]
+    let v: V3 = [h[1] * t[2] - h[2] * t[1], h[2] * t[0] - h[0] * t[2], h[0] * t[1] - h[1] * t[0]]
+    const l = Math.hypot(...v) || 1
+    v = [v[0] / l, v[1] / l, v[2] / l]
+    const c: V3 = [mid[0] - p[0], mid[1] - p[1], mid[2] - p[2]]
+    return v[0] * c[0] + v[1] * c[1] + v[2] * c[2] < 0 ? ([-v[0], -v[1], -v[2]] as V3) : v
+  })
+  return {
+    sA: curve.map((p, i) => off(off(p, inward[i], d), h, w)),
+    sB: curve.map((p, i) => off(off(p, inward[i], d), h, -w)),
+    roll: curve.map((p, i) => off(p, inward[i], d)),
+    wA: curve.map((p) => off(p, h, w)),
+    wB: curve.map((p) => off(p, h, -w)),
+    h, mid,
+  }
+}
+/** rib sizes: the transverse arches are the heaviest, the wall ribs the lightest */
+const RIB_T = { w: 6, d: 9 }
+const RIB_D = { w: 4.5, d: 6.5 }
+const RIB_W = { w: 3, d: 4.5 }
+
 interface BayGeo {
   z0: number
   transverseS: V3[]
@@ -159,6 +199,7 @@ interface BayGeo {
   cells: V3[][] // W, E, S, N
   courses: V3[][]
   boss: V3[][]
+  ribs: Rib[]
   wallLines: V3[][]
   piers: Pier[]
   platePolys: V3[][]
@@ -209,7 +250,17 @@ function bayGeo(k: number): BayGeo {
   }
   const ring = (r: number, y: number): V3[] =>
     Array.from({ length: 21 }, (_, i) => [Math.cos((i / 20) * Math.PI * 2) * r, y, Math.sin((i / 20) * Math.PI * 2) * r + zm] as V3)
-  const boss = [ring(11, CROWN - 1), ring(4.5, CROWN - 2)]
+  // the boss: a carved stone at the crossing, at the level of the ribs' soffits
+  const boss = [ring(10, CROWN - RIB_D.d - 1.5), ring(5, CROWN - RIB_D.d - 2.5)]
+  const s2 = Math.SQRT1_2
+  // painted in this order: wall ribs, diagonals, then the far transverse arch
+  // (this bay's near one belongs to the bay in front, except for the first)
+  const ribs: Rib[] = [
+    rib(wallW, [1, 0, 0], RIB_W.w, RIB_W.d), rib(wallE, [-1, 0, 0], RIB_W.w, RIB_W.d),
+    rib(d1, [s2, 0, -s2], RIB_D.w, RIB_D.d), rib(d2, [s2, 0, s2], RIB_D.w, RIB_D.d),
+    rib(transverseN, [0, 0, 1], RIB_T.w, RIB_T.d),
+    ...(k === 0 ? [rib(transverseS, [0, 0, 1], RIB_T.w, RIB_T.d)] : []),
+  ]
 
   // piers at the bay's front corners: a shaft, a capital where the arcade
   // springs, a capital under the vault, and a moulded base on a plinth
@@ -274,7 +325,7 @@ function bayGeo(k: number): BayGeo {
     flow.push([...rib, [foot[0], -FLOOR * 0.5, foot[2]] as V3, [foot[0], -FLOOR + 4, foot[2]] as V3])
   }
   return {
-    z0, transverseS, transverseN, wallW, wallE, d1, d2, cells, courses, boss, wallLines, piers,
+    z0, transverseS, transverseN, wallW, wallE, d1, d2, cells, courses, boss, ribs, wallLines, piers,
     platePolys: plates, lancets, oculi, flow,
   }
 }
@@ -355,8 +406,21 @@ export function buildVaultScene(parent: Element, defs: Element) {
     g: SVGGElement
     webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement
     glassB: SVGPathElement; glassR: SVGPathElement
-    courses: SVGPathElement; walls: SVGPathElement; ribs: SVGPathElement
-    ribHi: SVGPathElement; boss: SVGPathElement; flow: SVGPathElement
+    courses: SVGPathElement; walls: SVGPathElement
+    /** per rib: its visible side, its soffit, and its ink */
+    ribs: [SVGPathElement, SVGPathElement, SVGPathElement][]
+    ribHi: SVGPathElement; bossFill: SVGPathElement; boss: SVGPathElement; flow: SVGPathElement
+  }
+  // the ribs in painting order: wall ribs, diagonals and the gilded roll on
+  // them, then the transverse arches, which stand in front at the springers
+  const ribEls = (n: number, mk: (cls: string) => SVGPathElement) => {
+    const ribs: BayEls['ribs'] = []
+    let ribHi: SVGPathElement | undefined
+    for (let i = 0; i < n; i++) {
+      ribs.push([mk('rib-side'), mk('rib-soffit'), mk('ink fine')])
+      if (i === 3) ribHi = mk('ink rib')
+    }
+    return { ribs, ribHi: ribHi! }
   }
   // far to near, so nearer bays paint over farther ones
   const els: BayEls[] = []
@@ -368,8 +432,9 @@ export function buildVaultScene(parent: Element, defs: Element) {
       webA: mk('stone a'), webB: mk('stone b'),
       plate: mk('stone b', { 'fill-rule': 'evenodd' }),
       glassB: mk('', { fill: GLASS.cobalt }), glassR: mk('', { fill: GLASS.ruby }),
-      courses: mk('ink faint2'), walls: mk('ink fine fadeout'), ribs: mk('ink fine'),
-      ribHi: mk('ink rib'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
+      courses: mk('ink faint2'), walls: mk('ink fine fadeout'),
+      ...ribEls(geos[k].ribs.length, mk),
+      bossFill: mk('rib-soffit'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
     }
   }
   // the piers stand in front of everything a bay draws: their capitals hide the
@@ -392,21 +457,34 @@ export function buildVaultScene(parent: Element, defs: Element) {
     const P = makeProjector(p)
     const G = geos[k]
     const join = (ls: V3[][]) => ls.map((l) => P.line(l)).join('')
-    const ribs = join([G.transverseS, G.transverseN, G.d1, G.d2])
-    const walls = join([G.wallW, G.wallE, ...G.wallLines])
+    // each rib: the side turned to the eye, the soffit, and their edges
+    const eye: V3 = [0, p.ye, p.zc]
+    const ribParts = G.ribs.map((r) => {
+      const c = r.sA[Math.floor(r.sA.length / 2)]
+      const aFaces = r.h[0] * (eye[0] - c[0]) + r.h[2] * (eye[2] - c[2]) > 0
+      const [s, w] = aFaces ? [r.sA, r.wA] : [r.sB, r.wB]
+      return {
+        side: P.poly([...w, ...s.slice().reverse()]),
+        soffit: P.poly([...r.sA, ...r.sB.slice().reverse()]),
+        ink: join([r.sA, r.sB, r.roll, w]),
+      }
+    })
+    const ribs = ribParts.map((r) => r.ink).join('')
+    const walls = join(G.wallLines)
     const pieces = G.piers.flatMap((q) => pierPieces(q, p.ye, p.zc)).map((faces) => faces.map((f) => P.poly(f)).join(''))
     const piers = pieces.join('')
     const boss = join(G.boss)
-    if (!full) return { ribs, walls, piers, boss, pieces }
+    if (!full) return { ribs, walls, piers, boss, pieces, ribParts }
     return {
-      ribs, walls, piers, boss, pieces,
+      ribs, walls, piers, boss, pieces, ribParts,
+      bossFill: P.poly(G.boss[0]),
       webA: P.poly(G.cells[0]) + P.poly(G.cells[1]),
       webB: P.poly(G.cells[2]) + P.poly(G.cells[3]),
       plate: G.platePolys.map((q) => P.poly(q)).join(''),
       glassB: G.lancets.flat().filter((_, i) => i % 4 < 2).map((q) => P.poly(q)).join('') + G.oculi.map((q) => P.poly(q)).join(''),
       glassR: G.lancets.flat().filter((_, i) => i % 4 >= 2).map((q) => P.poly(q)).join(''),
       courses: join(G.courses),
-      ribHi: join([G.d1, G.d2]),
+      ribHi: join([G.ribs[2].roll, G.ribs[3].roll]),
       flow: join(G.flow),
     }
   }
@@ -453,8 +531,13 @@ export function buildVaultScene(parent: Element, defs: Element) {
       }
       set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate)
       set(E.glassB, b.glassB); set(E.glassR, b.glassR)
-      set(E.courses, b.courses); set(E.walls, b.walls); set(E.ribs, b.ribs)
-      set(E.ribHi, b.ribHi); set(E.boss, b.boss); set(E.flow, b.flow)
+      set(E.courses, b.courses); set(E.walls, b.walls)
+      b.ribParts.forEach((r, i) => {
+        const [side, soffit, ink] = E.ribs[i]
+        set(side, r.side); set(soffit, r.soffit); set(ink, r.ink)
+        setOp(side, stone); setOp(soffit, stone); setOp(ink, atm)
+      })
+      set(E.ribHi, b.ribHi); set(E.bossFill, b.bossFill); set(E.boss, b.boss); set(E.flow, b.flow)
       b.pieces.forEach((d, i) => {
         const e = pierPath(k, i)
         if (e.getAttribute('d') !== d) e.setAttribute('d', d)
@@ -463,7 +546,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       })
       for (let i = b.pieces.length; i < pierPaths[k].length; i++) pierPaths[k][i].setAttribute('d', '')
       setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone)
-      setOp(E.walls, atm); setOp(E.ribs, atm); setOp(E.boss, atm)
+      setOp(E.walls, atm); setOp(E.boss, atm); setOp(E.bossFill, stone)
       setOp(E.courses, courses * atm)
       setOp(E.ribHi, hi * atm)
       setOp(E.flow, flows * atm)

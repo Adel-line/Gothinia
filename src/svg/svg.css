@@ -105,6 +105,13 @@ body {
 .stone {
   fill: var(--stone);
 }
+/* the vault's ribs: a darker side and a lighter soffit, so each reads as a solid band */
+.rib-side {
+  fill: #1a1510;
+}
+.rib-soffit {
+  fill: #2e271e;
+}
 /* solid stone drawn with its edges: the vault's piers */
 .solid {
   fill: #221c16;
