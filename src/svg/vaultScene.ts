@@ -808,7 +808,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       for (let i = b.pieces.length; i < pierPaths[k].length; i++) pierPaths[k][i].setAttribute('d', '')
       setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone); setOp(E.plateLow, stone)
       setOp(E.walls, atm); setOp(E.boss, atm); setOp(E.bossFill, stone)
-      setOp(E.courses, courses * atm * near); setOp(E.bricks, courses * atm * near)
+      setOp(E.courses, courses * atm * near); setOp(E.bricks, 0.4 * courses * atm * near)
       setOp(E.ribHi, hi * atm)
       setOp(E.flow, flows * atm)
       E.flow.style.strokeDashoffset = String(-flowPhase)
