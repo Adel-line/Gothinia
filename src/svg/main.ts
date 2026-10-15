@@ -25,6 +25,7 @@ import { ROUND_X, buildArchScene } from './archScene'
 import { buildSwarm } from './swarm'
 import type { View } from './swarm'
 import { buildVaultScene } from './vaultScene'
+import { initNav } from './nav'
 
 /**
  * Prototype: Gothic architecture as a mason's drawing brought to life.
@@ -430,3 +431,4 @@ const tick = (now: number) => {
 }
 render(current)
 requestAnimationFrame(tick)
+initNav()
