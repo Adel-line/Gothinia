@@ -4,7 +4,7 @@ Scroll-driven documentary on how Gothic architecture works, told as a **mason's 
 
 ## The real project
 
-`index.html` -> `src/svg/main.ts`. That is the site. Everything else is either shared data or retired.
+`index.html` -> `src/svg/main.ts`. That is the site. Everything else is shared data or support material.
 
 ## Structure (`src/svg/`)
 
@@ -28,6 +28,6 @@ Scenes are pure functions of scroll progress, so scrolling must stay seamless in
 
 ## Retired: the 3D version
 
-The React Three Fiber version (`3d.html`, `src/main.tsx`, `src/App.tsx`, `src/three/`, `src/scenes/`, `src/overlay/`, `src/scroll/`, `public/textures/`, `tools/`) is kept for reference only. Do not extend it or fix bugs in it. `3d.html` is still a second Vite entry in `vite.config.ts`, which is why react/three deps remain in `package.json`. The SVG code does not import from it; the one shared module is `src/content/sections.ts`.
+The React Three Fiber version has been removed from the tree (`3d.html`, `src/three/`, `src/scenes/`, `src/overlay/`, `src/scroll/` and the react/three dependencies). Its code is kept at the git tag `archive/3d-version`. Do not bring it back or extend it. The only build dependencies now are vite and typescript.
 
 `References/` is source photography for the rose and stone; leave it alone.
