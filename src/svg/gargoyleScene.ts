@@ -1,5 +1,5 @@
 import { drawn, ease, el, ramp, setDraw, setOp } from './dom'
-import { EYE, MOUTH, buildGargoyle, cameraProjection, renderGargoyle } from './gargoyleMesh'
+import { EYE, MOUTH, buildGargoyle, cameraProjection, renderGargoyleInk } from './gargoyleMesh'
 
 /**
  * Scene 4 — the flying buttress and the gargoyle.
@@ -31,7 +31,7 @@ const PIER_X0 = 150
 const PIER_X1 = 200
 const PIER_TOP = -400
 /** where the model's origin lands: the top of its corbel, against the pier's face */
-const MESH_O: [number, number] = [252, -300]
+const MESH_O: [number, number] = [240, -300]
 
 const bez = (t: number, p0: number, c: number, p2: number) => (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * c + t * t * p2
 const topAt = (x: number) => -372 + (40 * x) / 150
@@ -116,7 +116,7 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
   // A sculpture, built in 3D and drawn as flat-shaded facets (gargoyleMesh.ts): crouched on
   // a corbel against the pier, arms braced, head thrust out over the edge, jaws wide, wings
   // swept back. Its edges draw on first, then the lit facets fill them in.
-  const CAM = { yaw: -0.45, pitch: 0.22 }
+  const CAM = { yaw: 0, pitch: 0 }
   const project = cameraProjection(CAM)
   /** a path from the renderer (model-screen units) into the scene's drawing space */
   const M = (d: string) => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_, a, b) => P(MESH_O[0] + +a, MESH_O[1] + +b))
@@ -162,18 +162,20 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
    * The sculpture itself: some 3,500 facets, built after the page's first paint (the
    * scene is far down the page). The swarm lands on its edges; its lit facets fill them in.
    */
-  let inkGarg: SVGPathElement | undefined
+  const beastLines: SVGPathElement[] = []
+  let beastHatch: SVGPathElement | undefined
   const targets: string[] = []
   function buildBeast(): void {
-    const render = renderGargoyle(buildGargoyle(), CAM)
-    const outline = M(render.outline)
-    // the facets, back to front, in runs of one tone; each stroked in its own colour so no seams show
-    for (const run of render.runs) {
-      el('path', { d: M(run.d), fill: run.fill, stroke: run.fill, 'stroke-width': S(0.35), 'stroke-linejoin': 'round' }, gGargFill)
-    }
-    inkGarg = ink(outline, 'fine', gGargOutline)
-    inkGarg.style.stroke = '#d9ccb2'
-    targets.push(outline)
+    const drawing = renderGargoyleInk(buildGargoyle(1.7), CAM)
+    el('path', { class: 'stone c', d: M(drawing.fill), 'fill-rule': 'nonzero' }, gGargFill)
+    el('path', { d: M(drawing.dark), fill: '#08080c' }, gGargFill)
+    beastHatch = ink(M(drawing.hatch), 'faint2', gGargFill)
+    const inner = ink(M(drawing.inner), 'fine', gGargOutline)
+    inner.style.strokeOpacity = '0.8'
+    inner.style.strokeWidth = 'calc(var(--px) * 0.8px)'
+    const outer = ink(M(drawing.outer), 'bold', gGargOutline)
+    beastLines.push(inner, outer)
+    targets.push(M(drawing.outer), M(drawing.inner))
   }
   const ready = new Promise<void>((done) =>
     requestAnimationFrame(() => setTimeout(() => { buildBeast(); done() }, 0)))
@@ -263,7 +265,8 @@ export function buildGargoyleScene(parent: Element, place: GargoylePlacement) {
     thrust.style.strokeDashoffset = String(-flowPhase * k)
     setOp(weight, Math.min(ramp(q, 0.36, 0.4), forcesOut))
     // the gargoyle is carved
-    if (inkGarg) setDraw(inkGarg, ease(ramp(q, 0.42, 0.54)))
+    for (const e of beastLines) setDraw(e, ease(ramp(q, 0.42, 0.54)))
+    if (beastHatch) setDraw(beastHatch, ease(ramp(q, 0.54, 0.64)))
     // rain, the channel, the spout
     setOp(rain, ramp(q, 0.58, 0.66) * 0.55)
     rain.style.strokeDashoffset = String(-flowPhase * k * 1.7)
