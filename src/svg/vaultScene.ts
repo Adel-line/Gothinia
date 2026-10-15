@@ -32,8 +32,8 @@ const fogVis = (z: number) => Math.exp(-Math.max(0, z - 320) / 480)
 const GROUND = [0x0d, 0x0b, 0x09], PIER_STONE = [0x22, 0x1c, 0x16]
 const F = 470 // focal length, in drawing units
 const NEAR = 14
-const PIER = 6 // half-width of a pier
-const PIER_CAP = 9 // half-width of the capital
+const PIER = 8 // half-width of a pier
+const PIER_CAP = 12 // half-width of the capital
 
 const GLASS = { cobalt: '#1d3a9e', ruby: '#9c1a24' }
 
@@ -117,11 +117,10 @@ interface Pier { px: number; pz: number; rings: Ring[] }
 function pierPieces(pr: Pier, ye: number, zc: number): V3[][][] {
   const { px, pz, rings } = pr
   const eye: V3 = [0, ye, zc]
-  const sx = px < 0 ? 1 : -1 // toward the nave
   /** the ring's four corners, anticlockwise seen from above */
   const rect = ([h, y, eng]: Ring): V3[] => {
-    const x0 = eng ? (sx > 0 ? px : px - h) : px - h
-    const x1 = eng ? (sx > 0 ? px + h : px) : px + h
+    void eng
+    const x0 = px - h, x1 = px + h
     return [[x0, y, pz - h], [x1, y, pz - h], [x1, y, pz + h], [x0, y, pz + h]]
   }
   const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
