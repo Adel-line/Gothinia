@@ -221,8 +221,8 @@ const SHOTS4: [number, Shot][] = [
   [(T3_START + T3_END) / 2, zoomed({ ...VAULT, cx: -150 }, 1.6)],
   [T3_END + 0.006, BUTTRESS],
   [q4(0.4), BUTTRESS],
-  [q4(0.52), gShot(110, -430, 470, -170)], // close on the gargoyle
-  [q4(0.7), gShot(110, -430, 470, -170)],
+  [q4(0.52), gShot(140, -440, 480, -190)], // close on the gargoyle
+  [q4(0.7), gShot(140, -440, 480, -190)],
   [q4(0.82), BUTTRESS_TEXT],
   [1.0, BUTTRESS_TEXT],
 ]
@@ -325,6 +325,7 @@ setTimeout(async () => {
   swarm2 = await buildSwarm(svg, arch.sources, vault.targets(), viewAt(T2_START), { seed: 13 })
   redraw()
   // …and the vault's lines melt and land as the buttress
+  await garg.ready
   swarm3 = await buildSwarm(svg, vault.sources(), garg.targets, viewAt(T3_START), { seed: 29 })
   redraw()
 }, 0)
