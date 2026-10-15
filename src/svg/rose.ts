@@ -187,29 +187,3 @@ export function buildRose(): RoseOpening[] {
   }
   return out
 }
-
-/** Smallest distance between any two outlines (should be ≥ BAR). */
-export function minGap(ops: RoseOpening[]): number {
-  let best = Infinity
-  const segDist = (p: P, a: P, b: P) => {
-    const dx = b[0] - a[0], dy = b[1] - a[1]
-    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy || 1)))
-    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)
-  }
-  for (let i = 0; i < ops.length; i++) {
-    for (let j = i + 1; j < ops.length; j++) {
-      const A = ops[i].pts, B = ops[j].pts
-      for (let s = 0; s < A.length; s += 2) {
-        for (let t = 0; t < B.length; t++) best = Math.min(best, segDist(A[s], B[t], B[(t + 1) % B.length]))
-      }
-    }
-  }
-  return best
-}
-
-/** Smallest distance from any outline to the glazing edge (r = 100). */
-export function rimGap(ops: RoseOpening[]): number {
-  let best = Infinity
-  for (const o of ops) for (const [x, y] of o.pts) best = Math.min(best, 100 - Math.hypot(x, y))
-  return best
-}

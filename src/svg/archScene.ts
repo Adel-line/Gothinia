@@ -22,7 +22,7 @@ import { multifoil } from './rose'
  * drawing's units.
  */
 
-export interface ArchPlacement {
+interface ArchPlacement {
   /** drawing-space position of the local origin (centre of the pointed arch's springing line) */
   x: number
   y: number

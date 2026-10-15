@@ -4,7 +4,7 @@
 // paragraphs and callout labels requires no code changes elsewhere.
 // ---------------------------------------------------------------------------
 
-export interface SectionContent {
+interface SectionContent {
   id: string
   kicker: string
   title: string
@@ -54,7 +54,7 @@ export const sections: SectionContent[] = [
   },
 ]
 
-/** The drawn version's third scene (the rib vault); the 3D scenes don't use it. */
+/** The third scene (the rib vault). */
 export const vaultSection: SectionContent = {
   id: 'rib-vault',
   kicker: 'Gothic structure · from c. 1140',
