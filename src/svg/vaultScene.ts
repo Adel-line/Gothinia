@@ -85,6 +85,46 @@ const circle2 = (u: number, y: number, r: number, n = 22): [number, number][] =>
 // ---- one bay's geometry (world space, built once) --------------------------------------
 const SILL = -62 // clerestory sill
 const ARCADE_SPRING = -270
+const TRI_SILL = -130 // triforium sill, just over the arcade's crown
+const TRI_SPRING = -102 // where the triforium heads spring
+const TRI_PIER = 5 // width of a triforium colonnette
+
+/**
+ * A square pier as a stack of rings [half-width, height]. Consecutive rings
+ * are joined at their corners, so every ring is tied to the next and nothing
+ * floats; only the faces turned toward the eye are drawn (see pierLines).
+ */
+interface Pier { px: number; pz: number; rings: [number, number][] }
+const CORNERS = [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const
+/** the outward normal of side i, which runs from corner i to corner i + 1 */
+const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const
+
+/**
+ * The pier's visible line-work from an eye at (0, ye, zc): each ring along the
+ * sides that face the eye, and the corner edges those sides share; plus the
+ * faces of the shaft as fill, so the wall behind a pier is hidden by it.
+ */
+function pierLines(pr: Pier, zc: number): { lines: V3[][]; faces: V3[][] } {
+  const { px, pz, rings } = pr
+  const facing = SIDES.map(([nx, nz]) => nx * (0 - px) + nz * (zc - pz) > PIER_CAP + 2)
+  const at = (k: number, h: number, y: number): V3 => [px + CORNERS[k][0] * h, y, pz + CORNERS[k][1] * h]
+  const lines: V3[][] = []
+  const faces: V3[][] = []
+  rings.forEach(([h, y], r) => {
+    // the sides of this ring that face the eye, as one run where they meet
+    for (let i = 0; i < 4; i++) if (facing[i]) lines.push([at(i, h, y), at((i + 1) % 4, h, y)])
+    if (r === rings.length - 1) return
+    const [h1, y1] = rings[r + 1]
+    if (y1 === y) return
+    for (let k = 0; k < 4; k++) {
+      if (facing[k] || facing[(k + 3) % 4]) lines.push([at(k, h, y), at(k, h1, y1)])
+    }
+    for (let i = 0; i < 4; i++) {
+      if (facing[i]) faces.push([at(i, h, y), at((i + 1) % 4, h, y), at((i + 1) % 4, h1, y1), at(i, h1, y1)])
+    }
+  })
+  return { lines, faces }
+}
 
 interface BayGeo {
   z0: number
@@ -98,7 +138,7 @@ interface BayGeo {
   courses: V3[][]
   boss: V3[][]
   wallLines: V3[][]
-  piers: V3[][]
+  piers: Pier[]
   platePolys: V3[][]
   lancets: V3[][][] // per side: lancet polygons
   oculi: V3[][]
@@ -132,16 +172,19 @@ function bayGeo(k: number): BayGeo {
     Array.from({ length: 21 }, (_, i) => [Math.cos((i / 20) * Math.PI * 2) * r, y, Math.sin((i / 20) * Math.PI * 2) * r + zm] as V3)
   const boss = [ring(11, CROWN - 1), ring(4.5, CROWN - 2)]
 
-  // piers at the four corners: a shaft, a capital, a base
-  const piers: V3[][] = []
-  for (const [px, pz] of [[-A, z0], [A, z0]] as const) {
-    for (const [ox, oz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
-      piers.push([[px + ox * PIER, -FLOOR + 10, pz + oz * PIER], [px + ox * PIER, -12, pz + oz * PIER]])
-    }
-    const sq = (h: number, y: number): V3[] => [[-h, y, -h], [h, y, -h], [h, y, h], [-h, y, h], [-h, y, -h]].map(([x, yy, z]) => [px + x, yy, pz + z] as V3)
-    piers.push(sq(PIER, -12), sq(PIER_CAP, -12), sq(PIER_CAP, -2), sq(PIER_CAP + 1.5, 0))
-    piers.push(sq(PIER + 2, -FLOOR + 10), sq(PIER + 3.5, -FLOOR + 4), sq(PIER + 3.5, -FLOOR))
-  }
+  // piers at the bay's front corners: a shaft, a capital where the arcade
+  // springs, a capital under the vault, and a moulded base on a plinth
+  const piers: Pier[] = ([[-A, z0], [A, z0]] as const).map(([px, pz]) => ({
+    px, pz,
+    rings: [
+      // plinth, base, shaft up to the arcade capital
+      [PIER + 3.5, -FLOOR], [PIER + 3.5, -FLOOR + 4], [PIER + 2, -FLOOR + 4], [PIER + 2, -FLOOR + 10], [PIER, -FLOOR + 10],
+      // arcade capital: bell and abacus; the arcade arches land on it
+      [PIER, ARCADE_SPRING - 10], [PIER_CAP, ARCADE_SPRING - 2], [PIER_CAP, ARCADE_SPRING], [PIER, ARCADE_SPRING],
+      // the vaulting shaft runs on up to the vault capital
+      [PIER, -12], [PIER_CAP, -2], [PIER_CAP + 1.5, -2], [PIER_CAP + 1.5, 0],
+    ],
+  }))
 
   // the walls: arcade below, clerestory above the string course
   const wallLines: V3[][] = []
@@ -150,13 +193,30 @@ function bayGeo(k: number): BayGeo {
   const oculi: V3[] [] = []
   const onWall = (s: -1 | 1, pts: [number, number][]): V3[] => pts.map(([u, y]) => [s * A, y, zm + u])
   for (const [si, s] of ([-1, 1] as const).entries()) {
-    const aw = pointed(A - PIER - 2)
-    wallLines.push(onWall(s, aw.map(([u, y]) => [u, y + ARCADE_SPRING])))
-    wallLines.push(onWall(s, [[-A, SILL], [A, SILL]]), onWall(s, [[-A, SILL - 7], [A, SILL - 7]]))
-    // plate: stone from the string course up to the wall arch, pierced by the windows
-    plates.push(onWall(s, [...ARCH, [A, SILL], [-A, SILL]]))
+    // the arcade: a pointed arch from capital to capital
+    const aw = pointed(A - PIER - 2).map(([u, y]): [number, number] => [u, y + ARCADE_SPRING])
+    wallLines.push(onWall(s, aw))
+    // the wall over the arcade, up to the clerestory sill: solid, pierced by the triforium
+    plates.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, ARCADE_SPRING], ...aw, [A - PIER, ARCADE_SPRING], [A - PIER, SILL]]))
+    // triforium: a string course, then five pointed openings on colonnettes
+    wallLines.push(onWall(s, [[-A + PIER, TRI_SILL], [A - PIER, TRI_SILL]]))
+    const tw = (2 * (A - PIER) - 6 * TRI_PIER) / 5
+    for (let i = 0; i < 5; i++) {
+      const uc = -A + PIER + TRI_PIER + tw / 2 + i * (tw + TRI_PIER)
+      const t = lancet(uc, tw, TRI_SILL, TRI_SPRING)
+      plates.push(onWall(s, t))
+      wallLines.push(onWall(s, [...t, t[0]]))
+    }
+    // clerestory sill: two strings, the whole width of the bay between the piers
+    wallLines.push(onWall(s, [[-A + PIER, SILL], [A - PIER, SILL]]), onWall(s, [[-A + PIER, SILL - 7], [A - PIER, SILL - 7]]))
+    // the floor, along the foot of the arcade from plinth to plinth
+    wallLines.push(onWall(s, [[-A + PIER + 3.5, -FLOOR], [A - PIER - 3.5, -FLOOR]]))
+    // clerestory: stone from the sill up to the wall arch, pierced by two lancets and an oculus
+    plates.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, 0], ...ARCH, [A - PIER, 0], [A - PIER, SILL]]))
+    // where the wall meets the pier, from the arcade capital up to the vault capital
+    for (const u of [-A + PIER, A - PIER]) wallLines.push(onWall(s, [[u, ARCADE_SPRING], [u, -12]]))
     for (const uc of [-27, 27]) {
-      const l = lancet(uc, 40, SILL + 6, 6)
+      const l = lancet(uc, 40, SILL, 6)
       lancets[si].push(onWall(s, l))
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
@@ -255,7 +315,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
     g: SVGGElement
     webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement
     glassB: SVGPathElement; glassR: SVGPathElement
-    courses: SVGPathElement; walls: SVGPathElement; piers: SVGPathElement; ribs: SVGPathElement
+    courses: SVGPathElement; walls: SVGPathElement; pierFill: SVGPathElement; piers: SVGPathElement; ribs: SVGPathElement
     ribHi: SVGPathElement; boss: SVGPathElement; flow: SVGPathElement
   }
   // far to near, so nearer bays paint over farther ones
@@ -268,7 +328,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       webA: mk('stone a'), webB: mk('stone b'),
       plate: mk('stone b', { 'fill-rule': 'evenodd' }),
       glassB: mk('', { fill: GLASS.cobalt }), glassR: mk('', { fill: GLASS.ruby }),
-      courses: mk('ink faint2'), walls: mk('ink fine fadeout'), piers: mk('ink fine fadeout'), ribs: mk('ink fine'),
+      courses: mk('ink faint2'), walls: mk('ink fine fadeout'), pierFill: mk('stone a'), piers: mk('ink fine fadeout'), ribs: mk('ink fine'),
       ribHi: mk('ink rib'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
     }
   }
@@ -280,11 +340,13 @@ export function buildVaultScene(parent: Element, defs: Element) {
     const join = (ls: V3[][]) => ls.map((l) => P.line(l)).join('')
     const ribs = join([G.transverseS, G.transverseN, G.d1, G.d2])
     const walls = join([G.wallW, G.wallE, ...G.wallLines])
-    const piers = join(G.piers)
+    const pl = G.piers.map((q) => pierLines(q, p.zc))
+    const piers = join(pl.flatMap((q) => q.lines))
     const boss = join(G.boss)
     if (!full) return { ribs, walls, piers, boss }
     return {
       ribs, walls, piers, boss,
+      pierFill: pl.flatMap((q) => q.faces).map((q) => P.poly(q)).join(''),
       webA: P.poly(G.cells[0]) + P.poly(G.cells[1]),
       webB: P.poly(G.cells[2]) + P.poly(G.cells[3]),
       plate: G.platePolys.map((q) => P.poly(q)).join(''),
@@ -337,9 +399,9 @@ export function buildVaultScene(parent: Element, defs: Element) {
       }
       set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate)
       set(E.glassB, b.glassB); set(E.glassR, b.glassR)
-      set(E.courses, b.courses); set(E.walls, b.walls); set(E.piers, b.piers); set(E.ribs, b.ribs)
+      set(E.courses, b.courses); set(E.walls, b.walls); set(E.pierFill, b.pierFill); set(E.piers, b.piers); set(E.ribs, b.ribs)
       set(E.ribHi, b.ribHi); set(E.boss, b.boss); set(E.flow, b.flow)
-      setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone)
+      setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone); setOp(E.pierFill, stone)
       setOp(E.courses, courses)
       setOp(E.ribHi, hi)
       setOp(E.flow, flows)

@@ -35,6 +35,9 @@ export const setDraw = (p: SVGPathElement, t: number) => {
   const c = p as SVGPathElement & Cached
   const dash = (1 - t).toFixed(4)
   if (c._dash !== dash) {
+    // a finished line drops its dash: the dash can fall a hair short of the
+    // path's end and leave a gap at the seam of a closed outline
+    if ((c._dash === '0.0000') !== (dash === '0.0000')) p.setAttribute('stroke-dasharray', dash === '0.0000' ? 'none' : '1 1')
     c._dash = dash
     p.setAttribute('stroke-dashoffset', dash)
   }

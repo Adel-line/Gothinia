@@ -187,13 +187,16 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
   const mouldInk = detail(mouldD, 'faint2')
 
   // capitals: foliate bells (with crockets) for the pointed arch, cushions for the round one
-  const crocket = (x: number, y0: number, h: number, dir: 1 | -1) =>
-    `M${P(x, y0)}V${Y(y0 - h + 1.2)}a${S(1.3)} ${S(1.3)} 0 1 ${dir === 1 ? 1 : 0} ${S(dir * 1.3)} ${S(-1.3)}`
+  // a crocket: a stalk rising from the astragal, ending in a knob that closes on itself
+  const crocket = (x: number, y0: number, h: number, dir: 1 | -1) => {
+    const kn = 1.1, sw = dir === 1 ? 1 : 0
+    return `M${P(x, y0)}V${Y(y0 - h + 2 * kn)}a${S(kn)} ${S(kn)} 0 0 ${sw} 0 ${S(-2 * kn)}a${S(kn)} ${S(kn)} 0 0 ${sw} 0 ${S(2 * kn)}`
+  }
   const gothicCap = (x: number) =>
     `M${P(x - 5.6, 5)}C${P(x - 5.6, 11)} ${P(x - 3.1, 14)} ${P(x - 3.1, 18)}` +
     `M${P(x + 5.6, 5)}C${P(x + 5.6, 11)} ${P(x + 3.1, 14)} ${P(x + 3.1, 18)}` +
     `M${P(x - 3.5, 18)}H${X(x + 3.5)}M${P(x - 3.5, 19.8)}H${X(x + 3.5)}` +
-    crocket(x - 3.6, 16.5, 8, -1) + crocket(x, 17, 9.5, 1) + crocket(x + 3.6, 16.5, 8, 1)
+    crocket(x - 2.4, 18, 8.5, -1) + crocket(x, 18, 10, 1) + crocket(x + 2.4, 18, 8.5, 1)
   const cushionCap = (x: number) =>
     `M${P(x - 6.8, 5)}V${Y(10)}C${P(x - 6.8, 16)} ${P(x - 4.6, 17.6)} ${P(x - 3.8, 19)}H${X(x + 3.8)}` +
     `C${P(x + 4.6, 17.6)} ${P(x + 6.8, 16)} ${P(x + 6.8, 10)}V${Y(5)}` +
@@ -216,7 +219,7 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     return (
       `M${P(x - w, y)}Q${P(x - w - 2.8, y + 0.8)} ${P(x - w - 2.6, y + 3.2)}Q${P(x - w - 2.4, y + 5.4)} ${P(x - w - 0.6, y + 5.4)}` +
       `H${X(x + w + 0.6)}Q${P(x + w + 2.4, y + 5.4)} ${P(x + w + 2.6, y + 3.2)}Q${P(x + w + 2.8, y + 0.8)} ${P(x + w, y)}` +
-      `M${P(x - w - 4.2, y + 5.4)}V${Y(y + 11)}H${X(x + w + 4.2)}V${Y(y + 5.4)}`
+      `M${P(x - w - 4.2, y + 5.4)}H${X(x + w + 4.2)}V${Y(PIER_FOOT)}H${X(x - w - 4.2)}Z`
     )
   }
   let shaftD = ''
@@ -230,9 +233,12 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     }
   }
   const shaftInk = detail(shaftD)
+  // three steps, each one closed at its ends by a riser, so every tread has an end
+  const STEP = 7
   const groundD =
-    `M${P(-130, PIER_FOOT)}H${X(ox + 130)}M${P(-138, PIER_FOOT + 7)}H${X(ox + 138)}` +
-    `M${P(-146, PIER_FOOT + 14)}H${X(ox + 146)}`
+    `M${P(-146, PIER_FOOT + 3 * STEP)}V${Y(PIER_FOOT + 2 * STEP)}H${X(-138)}V${Y(PIER_FOOT + STEP)}H${X(-130)}V${Y(PIER_FOOT)}` +
+    `H${X(ox + 130)}V${Y(PIER_FOOT + STEP)}H${X(ox + 138)}V${Y(PIER_FOOT + 2 * STEP)}H${X(ox + 146)}V${Y(PIER_FOOT + 3 * STEP)}Z` +
+    `M${P(-138, PIER_FOOT + STEP)}H${X(ox + 138)}M${P(-146, PIER_FOOT + 2 * STEP)}H${X(ox + 146)}`
   const groundInk = detail(groundD, 'bold')
 
   // hood moulds: a label with returns and stops over the pointed arch (a crocketed
@@ -244,12 +250,18 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     [1, -1].map((sd) => `M${P(c + sd * a, 14)}H${X(c + sd * b)}`).join('') +
     [1, -1].map((sd) => dot(c + sd * (a + b) / 2, 7, 2.1)).join('')
   const crocketOn = (rho: number, a: number, sd: 1 | -1) => {
-    // a hook on the hood's back, curling toward the crown
-    const bx = sd * (-50 + rho * Math.cos(a)), by = rho * Math.sin(a)
-    const nx = sd * Math.cos(a), ny = Math.sin(a) // outward
+    // a leaf on the hood's back, curling toward the crown: it springs from the
+    // hood and returns to it, so the outline is closed on the stone
+    const at = (t: number) => [sd * (-50 + rho * Math.cos(t)), rho * Math.sin(t)]
+    const nrm = (t: number) => [sd * Math.cos(t), Math.sin(t)] // outward
+    const [b0x, b0y] = at(a + 0.035), [b1x, b1y] = at(a - 0.035)
+    const [nx, ny] = nrm(a)
     const tx = sd * Math.sin(a), ty = -Math.cos(a) // along the arc, toward the crown
-    const ex = bx + nx * 3.6 + tx * 4.6, ey = by + ny * 3.6 + ty * 4.6
-    return `M${P(bx, by)}Q${P(bx + nx * 7, by + ny * 7)} ${P(ex, ey)}` + dot(ex, ey, 0.9)
+    const ex = b0x + nx * 4.2 + tx * 4.2, ey = b0y + ny * 4.2 + ty * 4.2
+    return (
+      `M${P(b0x, b0y)}Q${P(b0x + nx * 6.5 - tx * 1.5, b0y + ny * 6.5 - ty * 1.5)} ${P(ex, ey)}` +
+      `Q${P(b1x + nx * 2.4 + tx * 2.6, b1y + ny * 2.4 + ty * 2.6)} ${P(b1x, b1y)}`
+    )
   }
   const RH = R + T + 9
   let crockets = ''
@@ -257,7 +269,7 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
   const apexH = Math.sqrt(RH * RH - 2500)
   const finial =
     `M${P(0, -apexH)}C${P(-5.5, -apexH - 3.5)} ${P(-5.5, -apexH - 10)} ${P(0, -apexH - 15)}C${P(5.5, -apexH - 10)} ${P(5.5, -apexH - 3.5)} ${P(0, -apexH)}Z` +
-    `M${P(0, -apexH - 3)}V${Y(-apexH - 11)}`
+    `M${P(0, -apexH)}V${Y(-apexH - 15)}`
   const hoodRing = (rho: number) => {
     // chevron: teeth alternate between two radii around the semicircle
     const n = 16
@@ -276,6 +288,18 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     hoodRing(r0 + T + 3) + stops(ox, r0 + T + 3, r0 + T + 9)
   const hoodInk = detail(hoodD)
   const finialInk = detail(crockets + finial)
+  // the hoods are stone too: solid from the extrados out to the hood's back,
+  // with their returns down to the stops
+  const ret = (c: number, a: number, b: number) =>
+    [1, -1].map((sd) => `M${P(c + sd * a, 0)}H${X(c + sd * b)}V${Y(14)}H${X(c + sd * a)}Z`).join('')
+  el('path', {
+    class: 'stone b',
+    d:
+      `M${P(RH - 50, 0)}${arc(RH, 0, 0, -apexH)}${arc(RH, 0, 50 - RH, 0)}` +
+      `L${P(-50 - T, 0)}${arc(R + T, 1, 0, -APEX_X)}${arc(R + T, 1, 50 + T, 0)}Z` +
+      `M${P(ox + r0 + T + 9, 0)}${arc(r0 + T + 9, 0, ox - r0 - T - 9, 0)}L${P(ox - r0 - T, 0)}${arc(r0 + T, 1, ox + r0 + T, 0)}Z` +
+      ret(0, 50 + T + 4, 50 + T + 9) + ret(ox, r0 + T + 3, r0 + T + 9),
+  }, gStone)
 
   // the wall the arches stand in, laid in courses and faded at the edges;
   // each opening (with its hood) is cut out so the lines stop at the stone
@@ -321,7 +345,7 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     t.textContent = text
     return t
   }
-  const names = [label(0, PIER_FOOT + 16, 'Pointed'), label(ox, PIER_FOOT + 16, 'Round')]
+  const names = [label(0, PIER_FOOT + 31, 'Pointed'), label(ox, PIER_FOOT + 31, 'Round')]
   const heights = [
     label(ox + 94, -APEX + 2.5, 'rises ⅞ of its span', 'side'),
     label(ox + 94, -r0 + 2.5, 'rises ½ its span', 'side'),

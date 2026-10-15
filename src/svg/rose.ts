@@ -116,14 +116,20 @@ function lobedLight(phi: number, span: number, bar: number, rIn: number, rS: num
   const at = (u: number, v: number): P => [U[0] * u + V[0] * v, U[1] * u + V[1] * v]
   const sR = side(tA, rS, 1)
   const halfW = Math.abs(sR[0] * V[0] + sR[1] * V[1])
-  // trefoil head: three equal-ish lobes, all clearly visible
-  const b = halfW * 0.5 // side lobes
-  const a = halfW * 0.54 // top lobe
+  // pointed trefoil head, as in the Rayonnant lights: two round side lobes at
+  // the springing, and a pointed top lobe whose halves are struck from centres
+  // either side of the axis (each half from the far side, like the arch itself)
+  const b = halfW * 0.4 // side lobes, tangent to the bars at the springing
   const cR = at(rS, -(halfW - b))
   const cL = at(rS, halfW - b)
-  const cT = at(rS + b * 1.3, 0)
-  const kR = meet(cR, b, cT, a, at(rS - 10 * halfW, 0))
-  const kL = meet(cL, b, cT, a, at(rS - 10 * halfW, 0))
+  const uT = rS + b * 0.55 // the top lobe's centres stand this far out
+  const e = halfW * 0.34 // …this far either side of the axis
+  const rho = halfW * 1.0 // …and strike arcs of this radius
+  const tR = at(uT, e) // the right half is struck from the left centre
+  const tL = at(uT, -e)
+  const apex = at(uT + Math.sqrt(rho * rho - e * e), 0)
+  const kR = meet(cR, b, tR, rho, at(rS - 10 * halfW, 0))
+  const kL = meet(cL, b, tL, rho, at(rS - 10 * halfW, 0))
 
   const out: P[] = []
   // sill: arc along rIn from the left bar to the right bar
@@ -133,11 +139,13 @@ function lobedLight(phi: number, span: number, bar: number, rIn: number, rS: num
   // up the right side to the springing
   out.push(sR)
   lineTo(sR)
-  // right lobe → cusp → top lobe → cusp → left lobe, all the outer way round
+  // right lobe → cusp → the pointed top lobe → cusp → left lobe, all the outer way round
   const r0 = ang(cR, sR)
   out.push(...arc(cR[0], cR[1], b, r0, towards(r0, ang(cR, kR), -1)).slice(1))
-  const t0 = ang(cT, kR)
-  out.push(...arc(cT[0], cT[1], a, t0, towards(t0, ang(cT, kL), -1)).slice(1))
+  const t0 = ang(tR, kR)
+  out.push(...arc(tR[0], tR[1], rho, t0, towards(t0, ang(tR, apex), -1)).slice(1))
+  const t1 = ang(tL, apex)
+  out.push(...arc(tL[0], tL[1], rho, t1, towards(t1, ang(tL, kL), -1)).slice(1))
   const sL = side(tB, rS, -1)
   const l0 = ang(cL, kL)
   out.push(...arc(cL[0], cL[1], b, l0, towards(l0, ang(cL, sL), -1)).slice(1))
