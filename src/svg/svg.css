@@ -109,6 +109,12 @@ body {
 .rib-side {
   fill: #1a1510;
 }
+.lead {
+  fill: none;
+  stroke: #05060c;
+  stroke-width: calc(var(--px) * 0.7px);
+  stroke-linecap: round;
+}
 .rib-soffit {
   fill: #2e271e;
 }

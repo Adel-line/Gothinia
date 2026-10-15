@@ -1,4 +1,5 @@
 import { ease, ease5, el, lerp, ramp, setOp } from './dom'
+import { multifoil } from './rose'
 
 /**
  * Scene 3 — the rib vault.
@@ -35,7 +36,7 @@ const NEAR = 14
 const PIER = 6 // half-width of a pier
 const PIER_CAP = 9 // half-width of the capital
 
-const GLASS = { cobalt: '#1d3a9e', ruby: '#9c1a24' }
+const GLASS = { cobalt: '#1d3a9e', ruby: '#9c1a24', gold: '#c98a22' }
 
 // ---- curves -------------------------------------------------------------------
 /** A pointed arch of half-span s: arcs of radius 1.5 s struck from ±s/2 about the axis. Points (x, y). */
@@ -90,7 +91,8 @@ const SILL = -62 // clerestory sill
 const ARCADE_SPRING = -270
 const TRI_SILL = -130 // triforium sill, just over the arcade's crown
 const TRI_SPRING = -102 // where the triforium heads spring
-const TRI_PIER = 5 // width of a triforium colonnette
+const TRI_N = 4 // openings in each bay of the triforium
+const TRI_PIER = 12 // width of the stone between them
 /** how deep each kind of opening runs into the wall */
 const DEPTH = { arcade: PIER_CAP, triforium: 10, clerestory: 10 }
 /** how far each opening narrows toward the glass */
@@ -204,10 +206,11 @@ const RIB_W = { w: 3, d: 4.5 }
  * the way in.
  */
 interface Reveal { quads: V3[][]; n: V3[]; front: V3[]; back: V3[]; order: V3[]; closed: boolean; corners: number[] }
-function reveal(s: -1 | 1, zm: number, pts: [number, number][], depth: number, splay: number, closed: boolean): Reveal {
+/** at each point of an outline, the mitred direction into the shape, of length 1 across each side */
+function mitre(pts: [number, number][], closed: boolean): [number, number][] {
   const N = pts.length
   const cu = pts.reduce((a, [u]) => a + u / N, 0), cy = pts.reduce((a, [, y]) => a + y / N, 0)
-  // each segment's normal in the wall, pointing into the opening
+  // each segment's normal, pointing into the shape
   const segN = (i: number): [number, number] => {
     const j = (i + 1) % N
     const du = pts[j][0] - pts[i][0], dy = pts[j][1] - pts[i][1]
@@ -217,15 +220,26 @@ function reveal(s: -1 | 1, zm: number, pts: [number, number][], depth: number, s
     if (nu * (cu - mu) + ny * (cy - my) < 0) { nu = -nu; ny = -ny }
     return [nu, ny]
   }
-  // at each point, the direction the splay draws it in: the mitre of its two segments
-  const ptN = pts.map((_, i): [number, number] => {
+  return pts.map((_, i): [number, number] => {
     const has0 = closed || i > 0, has1 = closed || i < N - 1
     const a = has0 ? segN((i - 1 + N) % N) : segN(i), b = has1 ? segN(i) : a
     const mu = a[0] + b[0], my = a[1] + b[1]
     const l = Math.hypot(mu, my) || 1
-    const k = 1 / Math.max(0.5, (mu / l) * a[0] + (my / l) * a[1]) // mitre length
+    const k = 1 / Math.max(0.5, (mu / l) * a[0] + (my / l) * a[1])
     return [(mu / l) * k, (my / l) * k]
   })
+}
+/** an outline moved d into itself */
+const inset = (pts: [number, number][], d: number): [number, number][] => {
+  const n = mitre(pts, true)
+  return pts.map(([u, y], i) => [u + n[i][0] * d, y + n[i][1] * d])
+}
+
+function reveal(s: -1 | 1, zm: number, pts: [number, number][], depth: number, splay: number, closed: boolean): Reveal {
+  const N = pts.length
+  const cu = pts.reduce((a, [u]) => a + u / N, 0), cy = pts.reduce((a, [, y]) => a + y / N, 0)
+  // at each point, the direction the splay draws it in
+  const ptN = mitre(pts, closed)
   const at = (f: number) => pts.map(([u, y], i): V3 => [s * (A + depth * f), y + ptN[i][1] * splay * f, zm + u + ptN[i][0] * splay * f])
   const front = at(0), back = at(1), order = at(0.35)
   const axis: V3 = [s * (A + depth / 2), cy, zm + cu]
@@ -251,6 +265,56 @@ function reveal(s: -1 | 1, zm: number, pts: [number, number][], depth: number, s
   return { quads, n, front, back, order, closed, corners }
 }
 
+/** the part of the line p→q inside a convex outline (Cyrus–Beck), or null */
+function clipToConvex(poly: [number, number][], p: [number, number], q: [number, number]): [[number, number], [number, number]] | null {
+  const n = poly.length
+  const cu = poly.reduce((a, [u]) => a + u / n, 0), cy = poly.reduce((a, [, y]) => a + y / n, 0)
+  let t0 = 0, t1 = 1
+  const d = [q[0] - p[0], q[1] - p[1]]
+  for (let i = 0; i < n; i++) {
+    const a = poly[i], b = poly[(i + 1) % n]
+    let nu = -(b[1] - a[1]), ny = b[0] - a[0]
+    if (nu * (cu - a[0]) + ny * (cy - a[1]) < 0) { nu = -nu; ny = -ny }
+    const num = nu * (p[0] - a[0]) + ny * (p[1] - a[1]), den = nu * d[0] + ny * d[1]
+    if (Math.abs(den) < 1e-9) { if (num < 0) return null; continue }
+    const t = -num / den
+    if (den > 0) t0 = Math.max(t0, t)
+    else t1 = Math.min(t1, t)
+    if (t0 > t1) return null
+  }
+  return [[p[0] + d[0] * t0, p[1] + d[1] * t0], [p[0] + d[0] * t1, p[1] + d[1] * t1]]
+}
+
+/**
+ * Stained glass for a light, as in the arch scene: a cobalt ground leaded in
+ * diamond quarries, a ruby border, and a medallion at the heart (a gold ring
+ * round ruby, a cobalt quatrefoil, a gold boss). Each layer is a list of
+ * outlines in the plane of the glass; `lead` is the leading, as lines.
+ */
+interface Glass { cobalt: P2[][]; ruby: P2[][]; gold: P2[][]; disc: P2[][]; foil: P2[][]; boss: P2[][]; lead: P2[][] }
+type P2 = [number, number]
+type Glass3 = Record<keyof Glass, V3[][]>
+function stainedGlass(out: P2[], mid: P2, rMed: number): Glass {
+  const border = Math.min(3, rMed * 0.35)
+  const inner = inset(out, border)
+  const lead: P2[][] = [[...out, out[0]], [...inner, inner[0]]]
+  // the quarries: two families of diagonals, clipped to the field inside the border
+  const step = 5.5
+  for (const dir of [1, -1]) {
+    for (let c = -120; c <= 120; c += step) {
+      const p: P2 = [mid[0] + c - 80 * dir, mid[1] - 80], q: P2 = [mid[0] + c + 80 * dir, mid[1] + 80]
+      const seg = clipToConvex(inner, p, q)
+      if (seg) lead.push(seg)
+    }
+  }
+  const ring = circle2(mid[0], mid[1], rMed, 28)
+  const disc = circle2(mid[0], mid[1], rMed * 0.82, 28)
+  const foil = multifoil(mid, 4, rMed * 0.3, rMed * 0.33, Math.PI / 4)
+  const boss = circle2(mid[0], mid[1], rMed * 0.12, 12)
+  for (const o of [ring, disc, foil, boss]) lead.push([...o, o[0]])
+  return { cobalt: [out], ruby: [out, inner], gold: [ring], disc: [disc], foil: [foil], boss: [boss], lead }
+}
+
 interface BayGeo {
   z0: number
   transverseS: V3[]
@@ -268,6 +332,7 @@ interface BayGeo {
   platePolys: V3[][]
   lancets: V3[][][] // per side: lancet glass, at the back of the wall
   reveals: Reveal[]
+  triGlass: Glass3
   oculi: V3[][]
   flow: V3[][]
 }
@@ -347,6 +412,7 @@ function bayGeo(k: number): BayGeo {
   const lancets: V3[][][] = [[], []]
   const oculi: V3[] [] = []
   const reveals: Reveal[] = []
+  const triGlass: Glass3 = { cobalt: [], ruby: [], gold: [], disc: [], foil: [], boss: [], lead: [] }
   const onWall = (s: -1 | 1, pts: [number, number][]): V3[] => pts.map(([u, y]) => [s * A, y, zm + u])
   for (const [si, s] of ([-1, 1] as const).entries()) {
     // the arcade: a pointed arch from capital to capital
@@ -357,13 +423,17 @@ function bayGeo(k: number): BayGeo {
     plates.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, ARCADE_SPRING], ...aw, [A - PIER, ARCADE_SPRING], [A - PIER, SILL]]))
     // triforium: a string course, then five pointed openings on colonnettes
     wallLines.push(onWall(s, [[-A + PIER, TRI_SILL], [A - PIER, TRI_SILL]]))
-    const tw = (2 * (A - PIER) - 6 * TRI_PIER) / 5
-    for (let i = 0; i < 5; i++) {
+    const tw = (2 * (A - PIER) - (TRI_N + 1) * TRI_PIER) / TRI_N
+    for (let i = 0; i < TRI_N; i++) {
       const uc = -A + PIER + TRI_PIER + tw / 2 + i * (tw + TRI_PIER)
       const t = lancet(uc, tw, TRI_SILL, TRI_SPRING)
       plates.push(onWall(s, t))
       wallLines.push(onWall(s, [...t, t[0]]))
       reveals.push(reveal(s, zm, t, DEPTH.triforium, SPLAY.triforium, true))
+      // glazed, at the back of the wall
+      const gl = stainedGlass(inset(t, SPLAY.triforium), [uc, TRI_SPRING - 3], Math.min(9, tw / 2 - SPLAY.triforium - 4))
+      const back = (q: P2[]): V3[] => q.map(([u, y]) => [s * (A + DEPTH.triforium), y, zm + u])
+      for (const key of Object.keys(triGlass) as (keyof Glass)[]) triGlass[key].push(...gl[key].map(back))
     }
     // clerestory sill: two strings, the whole width of the bay between the piers
     wallLines.push(onWall(s, [[-A + PIER, SILL], [A - PIER, SILL]]), onWall(s, [[-A + PIER, SILL - 7], [A - PIER, SILL - 7]]))
@@ -397,7 +467,7 @@ function bayGeo(k: number): BayGeo {
   }
   return {
     z0, transverseS, transverseN, wallW, wallE, d1, d2, cells, courses, boss, ribs, wallLines, piers,
-    platePolys: plates, lancets, oculi, reveals, flow,
+    platePolys: plates, lancets, oculi, reveals, triGlass, flow,
   }
 }
 
@@ -477,6 +547,8 @@ export function buildVaultScene(parent: Element, defs: Element) {
     g: SVGGElement
     webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement
     glassB: SVGPathElement; glassR: SVGPathElement
+    /** the triforium's stained glass, layer by layer */
+    tri: Record<keyof Glass, SVGPathElement>
     /** the openings' reveals: each its faces and its edges, clipped to its own opening */
     revs: [SVGPathElement, SVGPathElement, SVGPathElement][]
     courses: SVGPathElement; walls: SVGPathElement
@@ -507,6 +579,11 @@ export function buildVaultScene(parent: Element, defs: Element) {
       webA: mk('stone a'), webB: mk('stone b'),
       // through the openings: the glass at the back of the wall, then the reveals, then the wall's face
       glassB: mk('', { fill: GLASS.cobalt }), glassR: mk('', { fill: GLASS.ruby }),
+      tri: {
+        cobalt: mk('', { fill: GLASS.cobalt }), ruby: mk('', { fill: GLASS.ruby, 'fill-rule': 'evenodd' }),
+        gold: mk('', { fill: GLASS.gold }), disc: mk('', { fill: GLASS.ruby }), foil: mk('', { fill: GLASS.cobalt }),
+        boss: mk('', { fill: GLASS.gold }), lead: mk('lead'),
+      },
       // (the reveals' edges go under the face too: where a reveal runs on behind it, so do they)
       revs: geos[k].reveals.map((_, i) => {
         const id = `vault-win-${k}-${i}`
@@ -611,6 +688,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       plate: G.platePolys.map((q) => P.poly(q)).join(''),
       glassB: G.lancets.flat().filter((_, i) => i % 4 < 2).map((q) => P.poly(q)).join('') + G.oculi.map((q) => P.poly(q)).join(''),
       glassR: G.lancets.flat().filter((_, i) => i % 4 >= 2).map((q) => P.poly(q)).join(''),
+      tri: Object.fromEntries(Object.entries(G.triGlass).map(([key, qs]) => [key, key === 'lead' ? join(qs) : qs.map((q) => P.poly(q)).join('')])) as Record<keyof Glass, string>,
       courses: join(G.courses),
       ribHi: join([G.ribs[2].roll, G.ribs[3].roll]),
       flow: join(G.flow),
@@ -667,6 +745,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       }
       set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate)
       set(E.glassB, b.glassB); set(E.glassR, b.glassR)
+      for (const key of Object.keys(E.tri) as (keyof Glass)[]) { set(E.tri[key], b.tri?.[key]); setOp(E.tri[key], glass) }
       set(E.courses, b.courses); set(E.walls, b.walls)
       b.revs.forEach((r, i) => {
         const [fill, ink, win] = E.revs[i]
