@@ -167,7 +167,7 @@ interface Rib {
   h: V3
   mid: V3
 }
-function rib(curve: V3[], h: V3, w: number, d: number): Rib {
+function rib(curve: V3[], h: V3, w: number, d: number, box?: { x: [number, number]; z: [number, number] }): Rib {
   const n = curve.length
   const a = curve[0], b = curve[n - 1]
   const mid: V3 = [(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2]
@@ -182,12 +182,21 @@ function rib(curve: V3[], h: V3, w: number, d: number): Rib {
     const c: V3 = [mid[0] - p[0], mid[1] - p[1], mid[2] - p[2]]
     return v[0] * c[0] + v[1] * c[1] + v[2] * c[2] < 0 ? ([-v[0], -v[1], -v[2]] as V3) : v
   })
+  // the soffit hangs below the curve, so at a springer, where the curve leans, it would
+  // dip beneath the capital it sits on: it stops on the capital's top instead
+  // a band that would stray outside the bay's own footprint (into the wall, past the
+  // transverse arch) is folded back onto its edge, so it ends on the capital, not beside it
+  const sit = (q: V3): V3 => [
+    box ? Math.min(box.x[1], Math.max(box.x[0], q[0])) : q[0],
+    Math.max(0, q[1]),
+    box ? Math.min(box.z[1], Math.max(box.z[0], q[2])) : q[2],
+  ]
   return {
-    sA: curve.map((p, i) => off(off(p, inward[i], d), h, w)),
-    sB: curve.map((p, i) => off(off(p, inward[i], d), h, -w)),
-    roll: curve.map((p, i) => off(p, inward[i], d)),
-    wA: curve.map((p) => off(p, h, w)),
-    wB: curve.map((p) => off(p, h, -w)),
+    sA: curve.map((p, i) => sit(off(off(p, inward[i], d), h, w))),
+    sB: curve.map((p, i) => sit(off(off(p, inward[i], d), h, -w))),
+    roll: curve.map((p, i) => sit(off(p, inward[i], d))),
+    wA: curve.map((p) => sit(off(p, h, w))),
+    wB: curve.map((p) => sit(off(p, h, -w))),
     h, mid,
   }
 }
@@ -259,7 +268,7 @@ function reveal(s: -1 | 1, zm: number, pts: [number, number][], depth: number, s
     const a = pts[(i - 1 + N) % N], b = pts[i], c = pts[(i + 1) % N]
     const t1 = Math.atan2(b[1] - a[1], b[0] - a[0]), t2 = Math.atan2(c[1] - b[1], c[0] - b[0])
     const turn = Math.abs(((t2 - t1 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI)
-    if (turn > 0.45) corners.push(i)
+    if (turn > 1.2) corners.push(i)
   }
   return { quads, n, front, back, order, closed, corners }
 }
@@ -361,7 +370,7 @@ function bayGeo(k: number): BayGeo {
   }
   const courses: V3[][] = []
   for (const [rim, a, b] of [[wallW, half.SW, half.NW], [wallE, half.SE, half.NE], [transverseS, half.SW, half.SE], [transverseN, half.NW, half.NE]] as const) {
-    for (const l of [0.2, 0.4, 0.6, 0.8]) {
+    for (const l of [0.33, 0.66]) {
       const y = l * CROWN
       const s0 = lerp3(rim[0], crown, l), s1 = lerp3(rim[rim.length - 1], crown, l)
       const e0 = onRib(a, y), e1 = onRib(b, y)
@@ -377,11 +386,14 @@ function bayGeo(k: number): BayGeo {
   // the boss: a carved stone at the crossing, at the level of the ribs' soffits
   const boss = [ring(10, CROWN - RIB_D.d - 1.5), ring(5, CROWN - RIB_D.d - 2.5)]
   const s2 = Math.SQRT1_2
+  const inBay = { x: [-A, A] as [number, number], z: [z0, z0 + BAY] as [number, number] }
   // painted in this order: wall ribs, diagonals, then the far transverse arch
   // (this bay's near one belongs to the bay in front, except for the first)
   const ribs: Rib[] = [
-    rib(wallW, [1, 0, 0], RIB_W.w, RIB_W.d), rib(wallE, [-1, 0, 0], RIB_W.w, RIB_W.d),
-    rib(d1, [s2, 0, -s2], RIB_D.w, RIB_D.d), rib(d2, [s2, 0, s2], RIB_D.w, RIB_D.d),
+    // a wall rib stands proud of the wall: its band lies wholly on the nave side
+    rib(wallW.map(([x, y, z]): V3 => [x + RIB_W.w, y, z]), [1, 0, 0], RIB_W.w, RIB_W.d, inBay),
+    rib(wallE.map(([x, y, z]): V3 => [x - RIB_W.w, y, z]), [-1, 0, 0], RIB_W.w, RIB_W.d, inBay),
+    rib(d1, [s2, 0, -s2], RIB_D.w, RIB_D.d, inBay), rib(d2, [s2, 0, s2], RIB_D.w, RIB_D.d, inBay),
     rib(transverseN, [0, 0, 1], RIB_T.w, RIB_T.d),
     ...(k === 0 ? [rib(transverseS, [0, 0, 1], RIB_T.w, RIB_T.d)] : []),
   ]
@@ -430,7 +442,7 @@ function bayGeo(k: number): BayGeo {
       plateLow.push(onWall(s, t))
       wallLines.push(onWall(s, [...t, t[0]]))
       reveals.push(reveal(s, zm, t, DEPTH.triforium, SPLAY.triforium, true))
-      glaze(s, t, DEPTH.triforium, SPLAY.triforium, 5)
+      glaze(s, t, DEPTH.triforium, SPLAY.triforium, 8)
     }
     // clerestory sill: two strings, the whole width of the bay between the piers
     wallLines.push(onWall(s, [[-A + PIER, SILL], [A - PIER, SILL]]), onWall(s, [[-A + PIER, SILL - 7], [A - PIER, SILL - 7]]))
@@ -443,14 +455,14 @@ function bayGeo(k: number): BayGeo {
     for (const uc of [-27, 27]) {
       const l = lancet(uc, 40, SILL, 6)
       const r = reveal(s, zm, l, DEPTH.clerestory, SPLAY.clerestory, true)
-      glaze(s, l, DEPTH.clerestory, SPLAY.clerestory, 6.5)
+      glaze(s, l, DEPTH.clerestory, SPLAY.clerestory, 11)
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
       reveals.push(r)
     }
     const o = circle2(0, 88, 15)
     const ro = reveal(s, zm, o, DEPTH.clerestory, SPLAY.clerestory, true)
-    glaze(s, o, DEPTH.clerestory, SPLAY.clerestory, 6)
+    glaze(s, o, DEPTH.clerestory, SPLAY.clerestory, 9)
     plates.push(onWall(s, o))
     wallLines.push(onWall(s, [...o, o[0]]))
     reveals.push(ro)
@@ -627,7 +639,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       return {
         side: P.poly([...w, ...s.slice().reverse()]),
         soffit: P.poly([...r.sA, ...r.sB.slice().reverse()]),
-        ink: join([r.sA, r.sB, r.roll, w]),
+        ink: join([r.sA, r.sB, w]),
       }
     })
     const ribs = ribParts.map((r) => r.ink).join('')
@@ -658,7 +670,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       }
       const pick = (line: V3[], i0: number, n: number) => Array.from({ length: n + 1 }, (_, k) => line[(i0 + k) % pts])
       for (const [i0, n] of runs) {
-        revInk.push(pick(r.back, i0, n), pick(r.order, i0, n))
+        revInk.push(pick(r.back, i0, n))
         // each end of a run is closed by the reveal's edge there, front to back:
         // an arris at a corner, the outline of the curve where it turns out of
         // sight. Whatever of it runs on behind the face of the wall is covered by it.
