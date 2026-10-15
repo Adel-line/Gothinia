@@ -90,40 +90,62 @@ const TRI_SPRING = -102 // where the triforium heads spring
 const TRI_PIER = 5 // width of a triforium colonnette
 
 /**
- * A square pier as a stack of rings [half-width, height]. Consecutive rings
- * are joined at their corners, so every ring is tied to the next and nothing
- * floats; only the faces turned toward the eye are drawn (see pierLines).
+ * A pier as a stack of rings [half-width, height, engaged?], bottom to top.
+ * Below the arcade the pier stands free, square; above it the vaulting shaft
+ * is engaged in the wall, so only its half on the nave side exists.
  */
-interface Pier { px: number; pz: number; rings: [number, number][] }
-const CORNERS = [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const
-/** the outward normal of side i, which runs from corner i to corner i + 1 */
-const SIDES = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const
+type Ring = [number, number, boolean]
+interface Pier { px: number; pz: number; rings: Ring[] }
 
 /**
- * The pier's visible line-work from an eye at (0, ye, zc): each ring along the
- * sides that face the eye, and the corner edges those sides share; plus the
- * faces of the shaft as fill, so the wall behind a pier is hidden by it.
+ * The pier as solid stone, seen from the eye at (0, ye, zc): a list of
+ * pieces, each the faces of one stage that are turned toward the eye, in the
+ * order to paint them (the stages farthest above or below the eye first), so
+ * nearer stone covers what is behind it and no hidden edge is drawn.
  */
-function pierLines(pr: Pier, zc: number): { lines: V3[][]; faces: V3[][] } {
+function pierPieces(pr: Pier, ye: number, zc: number): V3[][][] {
   const { px, pz, rings } = pr
-  const facing = SIDES.map(([nx, nz]) => nx * (0 - px) + nz * (zc - pz) > PIER_CAP + 2)
-  const at = (k: number, h: number, y: number): V3 => [px + CORNERS[k][0] * h, y, pz + CORNERS[k][1] * h]
-  const lines: V3[][] = []
-  const faces: V3[][] = []
-  rings.forEach(([h, y], r) => {
-    // the sides of this ring that face the eye, as one run where they meet
-    for (let i = 0; i < 4; i++) if (facing[i]) lines.push([at(i, h, y), at((i + 1) % 4, h, y)])
-    if (r === rings.length - 1) return
-    const [h1, y1] = rings[r + 1]
-    if (y1 === y) return
-    for (let k = 0; k < 4; k++) {
-      if (facing[k] || facing[(k + 3) % 4]) lines.push([at(k, h, y), at(k, h1, y1)])
+  const eye: V3 = [0, ye, zc]
+  const sx = px < 0 ? 1 : -1 // toward the nave
+  /** the ring's four corners, anticlockwise seen from above */
+  const rect = ([h, y, eng]: Ring): V3[] => {
+    const x0 = eng ? (sx > 0 ? px : px - h) : px - h
+    const x1 = eng ? (sx > 0 ? px + h : px) : px + h
+    return [[x0, y, pz - h], [x1, y, pz - h], [x1, y, pz + h], [x0, y, pz + h]]
+  }
+  const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+  const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+  const mid = (q: V3[]): V3 => q.reduce((m, v) => [m[0] + v[0] / q.length, m[1] + v[1] / q.length, m[2] + v[2] / q.length], [0, 0, 0] as V3)
+  const pieces: { key: number; order: number; faces: V3[][] }[] = []
+  const dist = (y0: number, y1: number) => (ye >= Math.min(y0, y1) && ye <= Math.max(y0, y1) ? 0 : Math.min(Math.abs(y0 - ye), Math.abs(y1 - ye)))
+  for (let r = 0; r < rings.length - 1; r++) {
+    const a = rect(rings[r]), b = rect(rings[r + 1])
+    const y0 = rings[r][1], y1 = rings[r + 1][1]
+    if (y0 === y1) {
+      // a level step: the wider ring's top (or underside) shows if it faces the eye
+      const up = rings[r][0] > rings[r + 1][0]
+      if (up ? ye > y0 : ye < y0) pieces.push({ key: Math.abs(y0 - ye), order: 1, faces: [up ? a : b] })
+      continue
     }
+    const centre = mid([...a, ...b])
+    const faces: V3[][] = []
     for (let i = 0; i < 4; i++) {
-      if (facing[i]) faces.push([at(i, h, y), at((i + 1) % 4, h, y), at((i + 1) % 4, h1, y1), at(i, h1, y1)])
+      const j = (i + 1) % 4
+      const q = [a[i], a[j], b[j], b[i]]
+      const c = mid(q)
+      let n = cross(sub(q[1], q[0]), sub(q[3], q[0]))
+      const out = sub(c, centre)
+      if (dot(n, [out[0], 0, out[2]]) < 0) n = [-n[0], -n[1], -n[2]]
+      if (dot(n, sub(eye, c)) > 1e-6) faces.push(q)
     }
-  })
-  return { lines, faces }
+    pieces.push({ key: dist(y0, y1), order: 0, faces })
+  }
+  // the top of the stack: shows only from above
+  const top = rings[rings.length - 1]
+  if (ye > top[1]) pieces.push({ key: Math.abs(top[1] - ye), order: 1, faces: [rect(top)] })
+  pieces.sort((p, q) => q.key - p.key || p.order - q.order)
+  return pieces.map((p) => p.faces)
 }
 
 interface BayGeo {
@@ -163,10 +185,27 @@ function bayGeo(k: number): BayGeo {
     [...transverseN, ...rev(d1.slice(m)), ...d2.slice(m)],
   ]
   const crown = d1[m]
-  // courses: the rim of each cell, shrunk toward the crown
+  // courses of the webbing: each follows its cell's rim, raised toward the
+  // crown, and runs from one diagonal rib to the other, ending on both
+  const half = { SW: d1.slice(0, m + 1), NE: rev(d1.slice(m)), SE: d2.slice(0, m + 1), NW: rev(d2.slice(m)) }
+  /** the point on a half-rib (springer → crown) at height y */
+  const onRib = (hr: V3[], y: number): V3 => {
+    const f = (2 / Math.PI) * Math.asin(Math.min(1, y / CROWN)) * m
+    const i = Math.min(m - 1, Math.floor(f))
+    return lerp3(hr[i], hr[i + 1], f - i)
+  }
   const courses: V3[][] = []
-  for (const rim of [wallW, wallE, transverseS, transverseN]) {
-    for (const l of [0.2, 0.4, 0.6, 0.8]) courses.push(rim.map((p) => lerp3(p, crown, l)))
+  for (const [rim, a, b] of [[wallW, half.SW, half.NW], [wallE, half.SE, half.NE], [transverseS, half.SW, half.SE], [transverseN, half.NW, half.NE]] as const) {
+    for (const l of [0.2, 0.4, 0.6, 0.8]) {
+      const y = l * CROWN
+      const s0 = lerp3(rim[0], crown, l), s1 = lerp3(rim[rim.length - 1], crown, l)
+      const e0 = onRib(a, y), e1 = onRib(b, y)
+      courses.push(rim.map((p, i) => {
+        const t = i / (rim.length - 1)
+        const q = lerp3(p, crown, l)
+        return [q[0] + (1 - t) * (e0[0] - s0[0]) + t * (e1[0] - s1[0]), q[1] + (1 - t) * (e0[1] - s0[1]) + t * (e1[1] - s1[1]), q[2] + (1 - t) * (e0[2] - s0[2]) + t * (e1[2] - s1[2])]
+      }))
+    }
   }
   const ring = (r: number, y: number): V3[] =>
     Array.from({ length: 21 }, (_, i) => [Math.cos((i / 20) * Math.PI * 2) * r, y, Math.sin((i / 20) * Math.PI * 2) * r + zm] as V3)
@@ -178,11 +217,12 @@ function bayGeo(k: number): BayGeo {
     px, pz,
     rings: [
       // plinth, base, shaft up to the arcade capital
-      [PIER + 3.5, -FLOOR], [PIER + 3.5, -FLOOR + 4], [PIER + 2, -FLOOR + 4], [PIER + 2, -FLOOR + 10], [PIER, -FLOOR + 10],
+      [PIER + 3.5, -FLOOR, false], [PIER + 3.5, -FLOOR + 4, false], [PIER + 2, -FLOOR + 4, false],
+      [PIER + 2, -FLOOR + 10, false], [PIER, -FLOOR + 10, false],
       // arcade capital: bell and abacus; the arcade arches land on it
-      [PIER, ARCADE_SPRING - 10], [PIER_CAP, ARCADE_SPRING - 2], [PIER_CAP, ARCADE_SPRING], [PIER, ARCADE_SPRING],
-      // the vaulting shaft runs on up to the vault capital
-      [PIER, -12], [PIER_CAP, -2], [PIER_CAP + 1.5, -2], [PIER_CAP + 1.5, 0],
+      [PIER, ARCADE_SPRING - 10, false], [PIER_CAP, ARCADE_SPRING - 2, false], [PIER_CAP, ARCADE_SPRING, false],
+      // the vaulting shaft, engaged in the wall, runs on up to the vault capital
+      [PIER, ARCADE_SPRING, true], [PIER, -12, true], [PIER_CAP, -2, true], [PIER_CAP + 1.5, -2, true], [PIER_CAP + 1.5, 0, true],
     ],
   }))
 
@@ -315,7 +355,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
     g: SVGGElement
     webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement
     glassB: SVGPathElement; glassR: SVGPathElement
-    courses: SVGPathElement; walls: SVGPathElement; pierFill: SVGPathElement; piers: SVGPathElement; ribs: SVGPathElement
+    courses: SVGPathElement; walls: SVGPathElement; ribs: SVGPathElement
     ribHi: SVGPathElement; boss: SVGPathElement; flow: SVGPathElement
   }
   // far to near, so nearer bays paint over farther ones
@@ -328,10 +368,24 @@ export function buildVaultScene(parent: Element, defs: Element) {
       webA: mk('stone a'), webB: mk('stone b'),
       plate: mk('stone b', { 'fill-rule': 'evenodd' }),
       glassB: mk('', { fill: GLASS.cobalt }), glassR: mk('', { fill: GLASS.ruby }),
-      courses: mk('ink faint2'), walls: mk('ink fine fadeout'), pierFill: mk('stone a'), piers: mk('ink fine fadeout'), ribs: mk('ink fine'),
+      courses: mk('ink faint2'), walls: mk('ink fine fadeout'), ribs: mk('ink fine'),
       ribHi: mk('ink rib'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
     }
   }
+  // the piers stand in front of everything a bay draws: their capitals hide the
+  // feet of the ribs that spring from them, and their shafts the wall behind.
+  // Each pier is a stack of solid pieces, painted in order (see pierPieces).
+  const pierG: SVGGElement[] = []
+  const pierPaths: SVGPathElement[][] = []
+  for (let k = BAYS - 1; k >= 0; k--) {
+    pierG[k] = el('g', {}, g)
+    pierPaths[k] = []
+  }
+  // the thrust is drawn over the stone it runs through
+  const flowG = el('g', {}, g)
+  for (let k = BAYS - 1; k >= 0; k--) flowG.appendChild(els[k].flow)
+  const pierPath = (k: number, i: number) =>
+    (pierPaths[k][i] ??= el('path', { class: 'solid', 'stroke-linejoin': 'round' }, pierG[k]))
 
   /** every piece of line-work at a pose, per kind (used to draw and as the swarm's landing outlines) */
   function build(p: Pose, k: number, full: boolean) {
@@ -340,13 +394,12 @@ export function buildVaultScene(parent: Element, defs: Element) {
     const join = (ls: V3[][]) => ls.map((l) => P.line(l)).join('')
     const ribs = join([G.transverseS, G.transverseN, G.d1, G.d2])
     const walls = join([G.wallW, G.wallE, ...G.wallLines])
-    const pl = G.piers.map((q) => pierLines(q, p.zc))
-    const piers = join(pl.flatMap((q) => q.lines))
+    const pieces = G.piers.flatMap((q) => pierPieces(q, p.ye, p.zc)).map((faces) => faces.map((f) => P.poly(f)).join(''))
+    const piers = pieces.join('')
     const boss = join(G.boss)
-    if (!full) return { ribs, walls, piers, boss }
+    if (!full) return { ribs, walls, piers, boss, pieces }
     return {
-      ribs, walls, piers, boss,
-      pierFill: pl.flatMap((q) => q.faces).map((q) => P.poly(q)).join(''),
+      ribs, walls, piers, boss, pieces,
       webA: P.poly(G.cells[0]) + P.poly(G.cells[1]),
       webB: P.poly(G.cells[2]) + P.poly(G.cells[3]),
       plate: G.platePolys.map((q) => P.poly(q)).join(''),
@@ -385,13 +438,14 @@ export function buildVaultScene(parent: Element, defs: Element) {
       const G = geos[k]
       const zrel = G.z0 + A - p.zc
       const visible = formed > 0 && zrel > -A - 40 && zrel < 2200
-      if (!visible) {
-        if (E.g.style.display !== 'none') E.g.style.display = 'none'
-        continue
+      for (const e of [E.g, pierG[k], E.flow]) {
+        const d = visible ? '' : 'none'
+        if (e.style.display !== d) e.style.display = d
       }
-      if (E.g.style.display === 'none') E.g.style.display = ''
-      // atmosphere: distant bays recede
-      setOp(E.g, Math.max(0.12, Math.min(1, 1.25 - Math.max(0, zrel) / 1500)))
+      if (!visible) continue
+      // atmosphere: distant bays recede. Only the ink fades; the stone stays
+      // solid, so no bay is ever seen through another
+      const atm = Math.max(0.12, Math.min(1, 1.25 - Math.max(0, zrel) / 1500))
       const b = build(p, k, true)
       const set = (e: SVGPathElement, d: string | undefined) => {
         const cur = e.getAttribute('d')
@@ -399,14 +453,22 @@ export function buildVaultScene(parent: Element, defs: Element) {
       }
       set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate)
       set(E.glassB, b.glassB); set(E.glassR, b.glassR)
-      set(E.courses, b.courses); set(E.walls, b.walls); set(E.pierFill, b.pierFill); set(E.piers, b.piers); set(E.ribs, b.ribs)
+      set(E.courses, b.courses); set(E.walls, b.walls); set(E.ribs, b.ribs)
       set(E.ribHi, b.ribHi); set(E.boss, b.boss); set(E.flow, b.flow)
-      setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone); setOp(E.pierFill, stone)
-      setOp(E.courses, courses)
-      setOp(E.ribHi, hi)
-      setOp(E.flow, flows)
+      b.pieces.forEach((d, i) => {
+        const e = pierPath(k, i)
+        if (e.getAttribute('d') !== d) e.setAttribute('d', d)
+        e.setAttribute('fill-opacity', stone.toFixed(3))
+        e.setAttribute('stroke-opacity', atm.toFixed(3))
+      })
+      for (let i = b.pieces.length; i < pierPaths[k].length; i++) pierPaths[k][i].setAttribute('d', '')
+      setOp(E.webA, stone); setOp(E.webB, stone); setOp(E.plate, stone)
+      setOp(E.walls, atm); setOp(E.ribs, atm); setOp(E.boss, atm)
+      setOp(E.courses, courses * atm)
+      setOp(E.ribHi, hi * atm)
+      setOp(E.flow, flows * atm)
       E.flow.style.strokeDashoffset = String(-flowPhase)
-      setOp(E.glassB, glass * 0.92); setOp(E.glassR, glass * 0.92)
+      setOp(E.glassB, glass); setOp(E.glassR, glass)
     }
   }
 

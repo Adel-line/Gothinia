@@ -105,6 +105,12 @@ body {
 .stone {
   fill: var(--stone);
 }
+/* solid stone drawn with its edges: the vault's piers */
+.solid {
+  fill: #221c16;
+  stroke: url(#vault-fade);
+  stroke-width: calc(var(--px) * 1.1px);
+}
 .stone.a {
   fill: #221c16;
 }
