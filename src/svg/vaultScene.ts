@@ -433,8 +433,8 @@ function bayGeo(k: number): BayGeo {
     // the first pair are round from base to vault capital
     rings: ([
       // plinth, base, shaft up to the arcade capital
-      [PIER + 3.5, -FLOOR, 0], [PIER + 3.5, -FLOOR + 4, 0], [PIER + 2, -FLOOR + 4, 0],
-      [PIER + 2, -FLOOR + 10, 0], [PIER, -FLOOR + 10, 0],
+      [PIER + 8, -FLOOR, 0], [PIER + 8, -FLOOR + 11, 0], [PIER + 5.5, -FLOOR + 11, 0],
+      [PIER + 5.5, -FLOOR + 26, 0], [PIER, -FLOOR + 26, 0],
       // arcade capital: bell and abacus; the arcade arches land on it
       [PIER, ARCADE_SPRING - 10, 0], [PIER_CAP, ARCADE_SPRING - 5, 0], [PIER_CAP, ARCADE_SPRING - 4, 0],
       [ABACUS, ARCADE_SPRING - 4, 1], [ABACUS, ARCADE_SPRING, 1],
@@ -485,7 +485,7 @@ function bayGeo(k: number): BayGeo {
     // clerestory sill: two strings, the whole width of the bay between the piers
     wallLines.push(onWall(s, [[-A + PIER, SILL], [A - PIER, SILL]]), onWall(s, [[-A + PIER, SILL - 7], [A - PIER, SILL - 7]]))
     // the floor, along the foot of the arcade from plinth to plinth
-    wallLines.push(onWall(s, [[-A + PIER + 3.5, -FLOOR], [A - PIER - 3.5, -FLOOR]]))
+    wallLines.push(onWall(s, [[-A + PIER + 8, -FLOOR], [A - PIER - 8, -FLOOR]]))
     // clerestory: stone from the sill up to the wall arch, pierced by two lancets and an oculus
     plates.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, 0], ...ARCH, [A - PIER, 0], [A - PIER, SILL]]))
     // where the wall meets the pier, from the arcade capital up to the vault capital
