@@ -200,14 +200,24 @@ function rib(curve: V3[], h: V3, w: number, d: number, box?: { x: [number, numbe
   const mid: V3 = [(a[0] + b[0]) / 2, 0, (a[2] + b[2]) / 2]
   const off = (p: V3, v: V3, k: number): V3 => [p[0] + v[0] * k, p[1] + v[1] * k, p[2] + v[2] * k]
   // toward the arch's centre: in the rib's plane, square to the curve
+  // at each point the normals of the two segments meeting there are mitred, so the offset of
+  // a pointed crown keeps its point instead of dipping into a notch
   const inward = curve.map((p, i) => {
-    const q0 = curve[Math.max(0, i - 1)], q1 = curve[Math.min(n - 1, i + 1)]
-    const t: V3 = [q1[0] - q0[0], q1[1] - q0[1], q1[2] - q0[2]]
-    let v: V3 = [h[1] * t[2] - h[2] * t[1], h[2] * t[0] - h[0] * t[2], h[0] * t[1] - h[1] * t[0]]
-    const l = Math.hypot(...v) || 1
-    v = [v[0] / l, v[1] / l, v[2] / l]
-    const c: V3 = [mid[0] - p[0], mid[1] - p[1], mid[2] - p[2]]
-    return v[0] * c[0] + v[1] * c[1] + v[2] * c[2] < 0 ? ([-v[0], -v[1], -v[2]] as V3) : v
+    const norm = (a: V3, b: V3): V3 | null => {
+      const t: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+      let v: V3 = [h[1] * t[2] - h[2] * t[1], h[2] * t[0] - h[0] * t[2], h[0] * t[1] - h[1] * t[0]]
+      const l = Math.hypot(...v)
+      if (l < 1e-9) return null
+      v = [v[0] / l, v[1] / l, v[2] / l]
+      const c: V3 = [mid[0] - p[0], mid[1] - p[1], mid[2] - p[2]]
+      return v[0] * c[0] + v[1] * c[1] + v[2] * c[2] < 0 ? ([-v[0], -v[1], -v[2]] as V3) : v
+    }
+    const na = i > 0 ? norm(curve[i - 1], p) : null, nb = i < n - 1 ? norm(p, curve[i + 1]) : null
+    if (!na || !nb) return (na ?? nb ?? [0, -1, 0]) as V3
+    const m: V3 = [na[0] + nb[0], na[1] + nb[1], na[2] + nb[2]]
+    const lm = Math.hypot(...m) || 1
+    const k = Math.min(3, 1 / Math.max(0.01, (m[0] * na[0] + m[1] * na[1] + m[2] * na[2]) / lm))
+    return [m[0] / lm * k, m[1] / lm * k, m[2] / lm * k] as V3
   })
   // the soffit hangs below the curve, so at a springer, where the curve leans, it would
   // dip beneath the capital it sits on: it stops on the capital's top instead
@@ -218,12 +228,29 @@ function rib(curve: V3[], h: V3, w: number, d: number, box?: { x: [number, numbe
     Math.max(0, q[1]),
     box ? Math.min(box.z[1], Math.max(box.z[0], q[2])) : q[2],
   ]
+  // where the fold clamps a stretch of the band to the footprint's edge, the line would kink as
+  // it leaves the edge; that stretch (and a little beyond) is rounded off
+  const fold = (raw: V3[]): V3[] => {
+    const out = raw.map(sit)
+    const hit = out.map((q, i) => Math.abs(q[0] - raw[i][0]) + Math.abs(q[2] - raw[i][2]) > 1e-6)
+    if (!hit.includes(true)) return out
+    // each clamped stretch, and 6 points past it
+    const flag = out.map((_, i) => hit.some((hh, k) => hh && Math.abs(k - i) <= 6))
+    for (let pass = 0; pass < 6; pass++) {
+      const prev = out.map((q) => [...q] as V3)
+      for (let i = 2; i < n - 2; i++) {
+        if (!flag[i]) continue
+        out[i] = [0, 1, 2].map((c) => (prev[i - 1][c] + 2 * prev[i][c] + prev[i + 1][c]) / 4) as V3
+      }
+    }
+    return out
+  }
   return {
-    sA: curve.map((p, i) => sit(off(off(p, inward[i], d), h, w))),
-    sB: curve.map((p, i) => sit(off(off(p, inward[i], d), h, -w))),
-    roll: curve.map((p, i) => sit(off(p, inward[i], d))),
-    wA: curve.map((p) => sit(off(p, h, w))),
-    wB: curve.map((p) => sit(off(p, h, -w))),
+    sA: fold(curve.map((p, i) => off(off(p, inward[i], d), h, w))),
+    sB: fold(curve.map((p, i) => off(off(p, inward[i], d), h, -w))),
+    roll: fold(curve.map((p, i) => off(p, inward[i], d))),
+    wA: fold(curve.map((p) => off(p, h, w))),
+    wB: fold(curve.map((p) => off(p, h, -w))),
     h, mid,
   }
 }
