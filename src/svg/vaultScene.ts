@@ -161,7 +161,10 @@ function pierPieces(pr: Pier, ye: number, zc: number): V3[][][] {
     // column shows only its outline and no facet seams
     const faces: V3[][] = []
     if (vis.every(Boolean)) faces.push(a, b)
-    else {
+    else if (rings[r][2] === 1 && rings[r + 1][2] === 1) {
+      // a square block keeps its arrises: one face per visible side
+      for (let i = 0; i < N; i++) if (vis[i]) faces.push([a[i], a[(i + 1) % N], b[(i + 1) % N], b[i]])
+    } else {
       for (let s0 = 0; s0 < N; s0++) {
         if (!vis[s0] || vis[(s0 + N - 1) % N]) continue
         let len = 0
@@ -436,8 +439,9 @@ function bayGeo(k: number): BayGeo {
       [PIER + 8, -FLOOR, 0], [PIER + 8, -FLOOR + 11, 0], [PIER + 5.5, -FLOOR + 11, 0],
       [PIER + 5.5, -FLOOR + 26, 0], [PIER, -FLOOR + 26, 0],
       // arcade capital: bell and abacus; the arcade arches land on it
-      [PIER, ARCADE_SPRING - 10, 0], [PIER_CAP, ARCADE_SPRING - 5, 0], [PIER_CAP, ARCADE_SPRING - 4, 0],
-      [ABACUS, ARCADE_SPRING - 4, 1], [ABACUS, ARCADE_SPRING, 1],
+      [PIER, ARCADE_SPRING - 16, 0], [PIER + 2, ARCADE_SPRING - 16, 0], [PIER + 2, ARCADE_SPRING - 13, 0],
+      [PIER, ARCADE_SPRING - 13, 0], [PIER_CAP, ARCADE_SPRING - 5, 0], [PIER_CAP, ARCADE_SPRING - 4, 0],
+      [ABACUS, ARCADE_SPRING - 4, 1], [ABACUS, ARCADE_SPRING - 2, 1], [ABACUS - 2.5, ARCADE_SPRING, 1],
       // the vaulting shaft, engaged in the wall, runs on up to the vault capital
       [PIER, ARCADE_SPRING, 2], [PIER, -12, 2], [PIER_CAP, -2, 2], [PIER_CAP + 1.5, -2, 2], [PIER_CAP + 1.5, 0, 2],
     ] as Ring[]).map(([h, y, m]): Ring => [h, y, k === 0 ? (m === 2 ? 0 : m) : (m === 0 ? 2 : m)]),
