@@ -33,6 +33,7 @@ const GROUND = [0x0d, 0x0b, 0x09], PIER_STONE = [0x22, 0x1c, 0x16]
 const F = 470 // focal length, in drawing units
 const NEAR = 14
 const PIER = 8 // half-width of a pier
+const ABACUS = 14 // half-width of the square slab the arcade arches land on
 const COLUMN_N = 32 // facets round a column
 const PIER_CAP = 12 // half-width of the capital
 
@@ -102,7 +103,7 @@ const DEPTH = { arcade: PIER_CAP, triforium: 10, clerestory: 10 }
 const SPLAY = { arcade: 0, triforium: 2, clerestory: 3 }
 
 /**
- * A pier as a stack of rings [half-width, height, engaged?], bottom to top.
+ * A pier as a stack of rings [half-width, height, square?], bottom to top.
  * Both below and above the arcade the pier is a round column on one axis.
  */
 type Ring = [number, number, boolean]
@@ -117,9 +118,9 @@ interface Pier { px: number; pz: number; rings: Ring[] }
 function pierPieces(pr: Pier, ye: number, zc: number): V3[][][] {
   const { px, pz, rings } = pr
   const eye: V3 = [0, ye, zc]
-  /** the ring as a circle of N points, anticlockwise seen from above */
-  const rect = ([h, y]: Ring): V3[] =>
-    Array.from({ length: COLUMN_N }, (_, i): V3 => {
+  /** the ring as a circle of N points, or a square when flagged, anticlockwise seen from above */
+  const rect = ([h, y, sq]: Ring): V3[] =>
+    sq ? [[px + h, y, pz - h], [px + h, y, pz + h], [px - h, y, pz + h], [px - h, y, pz - h]] : Array.from({ length: COLUMN_N }, (_, i): V3 => {
       const t = (i / COLUMN_N) * Math.PI * 2
       return [px + h * Math.cos(t), y, pz + h * Math.sin(t)]
     })
@@ -425,9 +426,10 @@ function bayGeo(k: number): BayGeo {
       [PIER + 3.5, -FLOOR, false], [PIER + 3.5, -FLOOR + 4, false], [PIER + 2, -FLOOR + 4, false],
       [PIER + 2, -FLOOR + 10, false], [PIER, -FLOOR + 10, false],
       // arcade capital: bell and abacus; the arcade arches land on it
-      [PIER, ARCADE_SPRING - 10, false], [PIER_CAP, ARCADE_SPRING - 2, false], [PIER_CAP, ARCADE_SPRING, false],
+      [PIER, ARCADE_SPRING - 10, false], [PIER_CAP, ARCADE_SPRING - 5, false], [PIER_CAP, ARCADE_SPRING - 4, false],
+      [ABACUS, ARCADE_SPRING - 4, true], [ABACUS, ARCADE_SPRING, true],
       // the vaulting shaft, engaged in the wall, runs on up to the vault capital
-      [PIER, ARCADE_SPRING, true], [PIER, -12, true], [PIER_CAP, -2, true], [PIER_CAP + 1.5, -2, true], [PIER_CAP + 1.5, 0, true],
+      [PIER, ARCADE_SPRING, false], [PIER, -12, false], [PIER_CAP, -2, false], [PIER_CAP + 1.5, -2, false], [PIER_CAP + 1.5, 0, false],
     ],
   }))
 
@@ -514,7 +516,7 @@ function pose(q: number): Pose {
   const w = ease(ramp(q, 0.04, 0.96))
   const turn = ease5(ramp(q, 0.12, 0.96))
   // walk in, look up, and turn toward the wall to bring its windows round to face us
-  return { zc: lerp(POSE0.zc, -110, w), ye: lerp(POSE0.ye, -290, w), pitch: lerp(POSE0.pitch, 0.5, turn), yaw: lerp(0, -0.42, turn) }
+  return { zc: lerp(POSE0.zc, -30, w), ye: lerp(POSE0.ye, -290, w), pitch: lerp(POSE0.pitch, 0.64, turn), yaw: lerp(0, -0.56, turn) }
 }
 
 function makeProjector(p: Pose) {
