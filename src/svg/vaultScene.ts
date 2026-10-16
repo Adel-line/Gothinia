@@ -581,14 +581,30 @@ function bayGeo(k: number): BayGeo {
 }
 
 // ---- projection -----------------------------------------------------------------
-interface Pose { zc: number; ye: number; pitch: number; yaw: number }
+interface Pose { zc: number; ye: number; pitch: number; yaw: number; f: number }
 
-export const POSE0: Pose = { zc: -250, ye: -300, pitch: 0.42, yaw: 0 }
+/**
+ * A longer lens, so the columns and capitals near the edges are stretched less: the camera backs
+ * away along its line of sight by as much as the lens lengthens, so what is in the middle of the
+ * view stays the same size. (`base` is the pose for the original lens.)
+ */
+const LENS = 1.2
+const SUBJECT = 260 // distance to what the view is centred on
+function lensed(b: Omit<Pose, 'f'>): Pose {
+  const c = Math.cos(b.pitch), s = Math.sin(b.pitch)
+  const back = (LENS - 1) * SUBJECT
+  const zc = b.zc - back * c * Math.cos(b.yaw), ye = b.ye - back * s
+  // aim at the same point of the scene as before
+  const tx = SUBJECT * c * Math.sin(b.yaw), tz = b.zc + SUBJECT * c * Math.cos(b.yaw) - zc
+  const ty = b.ye + SUBJECT * s - ye
+  return { zc, ye, yaw: Math.atan2(tx, tz), pitch: Math.atan2(ty, Math.hypot(tx, tz)), f: F * LENS }
+}
+export const POSE0: Pose = lensed({ zc: -250, ye: -300, pitch: 0.42, yaw: 0 })
 function pose(q: number): Pose {
   const w = ease(ramp(q, 0.04, 0.96))
   const turn = ease5(ramp(q, 0.12, 0.96))
   // walk in, look up, and turn toward the wall to bring its windows round to face us
-  return { zc: lerp(POSE0.zc, -30, w), ye: lerp(POSE0.ye, -290, w), pitch: lerp(POSE0.pitch, 0.64, turn), yaw: lerp(0, -0.56, turn) }
+  return lensed({ zc: lerp(-250, -30, w), ye: lerp(-300, -290, w), pitch: lerp(0.42, 0.64, turn), yaw: lerp(0, -0.56, turn) })
 }
 
 function makeProjector(p: Pose) {
@@ -599,7 +615,7 @@ function makeProjector(p: Pose) {
     const x1 = v[0] * cyw - dz * syw, z1 = v[0] * syw + dz * cyw
     return [x1, dy * c - z1 * s, dy * s + z1 * c]
   }
-  const sc = (v: V3) => `${((F * v[0]) / v[2]).toFixed(1)} ${((-F * v[1]) / v[2]).toFixed(1)}`
+  const sc = (v: V3) => `${((p.f * v[0]) / v[2]).toFixed(1)} ${((-p.f * v[1]) / v[2]).toFixed(1)}`
   const cut = (a: V3, b: V3): V3 => {
     const t = (NEAR - a[2]) / (b[2] - a[2])
     return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), NEAR]
