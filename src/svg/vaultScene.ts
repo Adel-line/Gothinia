@@ -103,10 +103,10 @@ const DEPTH = { arcade: PIER_CAP, triforium: 10, clerestory: 10 }
 const SPLAY = { arcade: 0, triforium: 2, clerestory: 3 }
 
 /**
- * A pier as a stack of rings [half-width, height, square?], bottom to top.
+ * A pier as a stack of rings [half-width, height, round (0) | square (1) | half-round on the nave side (2)], bottom to top.
  * Both below and above the arcade the pier is a round column on one axis.
  */
-type Ring = [number, number, boolean]
+type Ring = [number, number, 0 | 1 | 2]
 interface Pier { px: number; pz: number; rings: Ring[] }
 
 /**
@@ -119,11 +119,18 @@ function pierPieces(pr: Pier, ye: number, zc: number): V3[][][] {
   const { px, pz, rings } = pr
   const eye: V3 = [0, ye, zc]
   /** the ring as a circle of N points, or a square when flagged, anticlockwise seen from above */
-  const rect = ([h, y, sq]: Ring): V3[] =>
-    sq ? [[px + h, y, pz - h], [px + h, y, pz + h], [px - h, y, pz + h], [px - h, y, pz - h]] : Array.from({ length: COLUMN_N }, (_, i): V3 => {
-      const t = (i / COLUMN_N) * Math.PI * 2
+  const sx = px < 0 ? 1 : -1 // toward the nave
+  const rect = ([h, y, mode]: Ring): V3[] => {
+    if (mode === 1) return [[px + h, y, pz - h], [px + h, y, pz + h], [px - h, y, pz + h], [px - h, y, pz - h]]
+    // an engaged shaft is a half-round: its flat back lies against the wall
+    const half = mode === 2
+    const n = half ? COLUMN_N / 2 + 1 : COLUMN_N
+    const t0 = half ? (sx > 0 ? -Math.PI / 2 : Math.PI / 2) : 0
+    return Array.from({ length: n }, (_, i): V3 => {
+      const t = t0 + (i / COLUMN_N) * Math.PI * 2
       return [px + h * Math.cos(t), y, pz + h * Math.sin(t)]
     })
+  }
   const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
   const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
   const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
@@ -423,13 +430,13 @@ function bayGeo(k: number): BayGeo {
     px, pz,
     rings: [
       // plinth, base, shaft up to the arcade capital
-      [PIER + 3.5, -FLOOR, false], [PIER + 3.5, -FLOOR + 4, false], [PIER + 2, -FLOOR + 4, false],
-      [PIER + 2, -FLOOR + 10, false], [PIER, -FLOOR + 10, false],
+      [PIER + 3.5, -FLOOR, 0], [PIER + 3.5, -FLOOR + 4, 0], [PIER + 2, -FLOOR + 4, 0],
+      [PIER + 2, -FLOOR + 10, 0], [PIER, -FLOOR + 10, 0],
       // arcade capital: bell and abacus; the arcade arches land on it
-      [PIER, ARCADE_SPRING - 10, false], [PIER_CAP, ARCADE_SPRING - 5, false], [PIER_CAP, ARCADE_SPRING - 4, false],
-      [ABACUS, ARCADE_SPRING - 4, true], [ABACUS, ARCADE_SPRING, true],
+      [PIER, ARCADE_SPRING - 10, 0], [PIER_CAP, ARCADE_SPRING - 5, 0], [PIER_CAP, ARCADE_SPRING - 4, 0],
+      [ABACUS, ARCADE_SPRING - 4, 1], [ABACUS, ARCADE_SPRING, 1],
       // the vaulting shaft, engaged in the wall, runs on up to the vault capital
-      [PIER, ARCADE_SPRING, false], [PIER, -12, false], [PIER_CAP, -2, false], [PIER_CAP + 1.5, -2, false], [PIER_CAP + 1.5, 0, false],
+      [PIER, ARCADE_SPRING, 2], [PIER, -12, 2], [PIER_CAP, -2, 2], [PIER_CAP + 1.5, -2, 2], [PIER_CAP + 1.5, 0, 2],
     ],
   }))
 
