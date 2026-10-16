@@ -428,7 +428,9 @@ function bayGeo(k: number): BayGeo {
   // springs, a capital under the vault, and a moulded base on a plinth
   const piers: Pier[] = ([[-A, z0], [A, z0]] as const).map(([px, pz]) => ({
     px, pz,
-    rings: [
+    // only the first pair, at the head of the nave, stand free: every later pier is
+    // built into the arcade wall, so its round parts show only on the nave side
+    rings: ([
       // plinth, base, shaft up to the arcade capital
       [PIER + 3.5, -FLOOR, 0], [PIER + 3.5, -FLOOR + 4, 0], [PIER + 2, -FLOOR + 4, 0],
       [PIER + 2, -FLOOR + 10, 0], [PIER, -FLOOR + 10, 0],
@@ -437,7 +439,7 @@ function bayGeo(k: number): BayGeo {
       [ABACUS, ARCADE_SPRING - 4, 1], [ABACUS, ARCADE_SPRING, 1],
       // the vaulting shaft, engaged in the wall, runs on up to the vault capital
       [PIER, ARCADE_SPRING, 2], [PIER, -12, 2], [PIER_CAP, -2, 2], [PIER_CAP + 1.5, -2, 2], [PIER_CAP + 1.5, 0, 2],
-    ],
+    ] as Ring[]).map(([h, y, m]): Ring => [h, y, k > 0 && m === 0 ? 2 : m]),
   }))
 
   // the walls: arcade below, clerestory above the string course
