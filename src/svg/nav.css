@@ -1,0 +1,107 @@
+/* side navigation: a ruled line with a tick and numeral per scene */
+.scenes {
+  position: fixed;
+  top: 50%;
+  right: clamp(12px, 2.4vw, 36px);
+  transform: translateY(-50%);
+  z-index: 10;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --g: 0;
+}
+.scenes ol {
+  list-style: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 54px;
+  padding: 6px 0;
+}
+/* the rule runs the height of the list; the lit part shows scroll progress */
+.scenes .rule {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  right: 4px;
+  width: 1px;
+  background: rgba(217, 204, 178, 0.22);
+}
+.scenes .rule::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #b8a468;
+  transform-origin: top;
+  transform: scaleY(var(--g));
+}
+.scenes a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 4px 0;
+  color: var(--ink);
+  text-decoration: none;
+  opacity: 0.55;
+  transition: opacity 0.25s;
+}
+.scenes a:hover,
+.scenes a:focus-visible,
+.scenes a[aria-current] {
+  opacity: 1;
+}
+.scenes a:focus-visible {
+  outline: 1px solid #b8a468;
+  outline-offset: 4px;
+}
+.scenes .num {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: #b8a468;
+}
+.scenes .name {
+  font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  white-space: nowrap;
+  text-shadow: 0 0 6px var(--bg), 0 0 12px var(--bg);
+}
+/* the tick sits on the rule; the current scene's becomes a compass-point diamond */
+.scenes .tick {
+  width: 9px;
+  height: 9px;
+  margin-right: -4px;
+  border: 1px solid var(--ink);
+  background: var(--bg);
+  transform: rotate(45deg) scale(0.7);
+  transition: transform 0.25s, background 0.25s, border-color 0.25s;
+}
+.scenes a:hover .tick,
+.scenes a:focus-visible .tick {
+  transform: rotate(45deg) scale(1);
+}
+.scenes a[aria-current] .tick {
+  transform: rotate(45deg) scale(1.15);
+  background: #b8a468;
+  border-color: #b8a468;
+}
+
+/* names live in the panels' way on a phone: keep the ticks and numerals */
+@media (max-width: 700px) {
+  .scenes .name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .scenes ol {
+    gap: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scenes a,
+  .scenes .tick {
+    transition: none;
+  }
+}
