@@ -581,25 +581,31 @@ function bayGeo(k: number): BayGeo {
 }
 
 // ---- projection -----------------------------------------------------------------
-interface Pose { zc: number; ye: number; pitch: number; yaw: number }
+/** `lean` is how far the camera is really tipped up (0 = level, with the view shifted instead, so
+ *  verticals stay upright; 1 = tipped the whole way, so they converge) */
+interface Pose { zc: number; ye: number; pitch: number; yaw: number; lean: number }
 
-export const POSE0: Pose = { zc: -250, ye: -300, pitch: 0.42, yaw: 0 }
+export const POSE0: Pose = { zc: -250, ye: -300, pitch: 0.42, yaw: 0, lean: 0 }
 function pose(q: number): Pose {
   const w = ease(ramp(q, 0.04, 0.96))
   const turn = ease5(ramp(q, 0.12, 0.96))
   // walk in, look up, and turn toward the wall to bring its windows round to face us
-  return { zc: lerp(POSE0.zc, -30, w), ye: lerp(POSE0.ye, -290, w), pitch: lerp(POSE0.pitch, 0.64, turn), yaw: lerp(0, -0.56, turn) }
+  return { zc: lerp(POSE0.zc, -30, w), ye: lerp(POSE0.ye, -290, w), pitch: lerp(POSE0.pitch, 0.64, turn), yaw: lerp(0, -0.56, turn), lean: turn }
 }
 
 function makeProjector(p: Pose) {
-  const c = Math.cos(p.pitch), s = Math.sin(p.pitch)
+  // the camera is tipped by only part of the pitch; the rest of the look-up is a shift of the
+  // frame, as with an architect's shift lens, so columns stand upright while the nave loads
+  const tip = p.pitch * p.lean
+  const c = Math.cos(tip), s = Math.sin(tip)
+  const shift = F * Math.tan(p.pitch - tip)
   const cyw = Math.cos(p.yaw), syw = Math.sin(p.yaw)
   const cam = (v: V3): V3 => {
     const dy = v[1] - p.ye, dz = v[2] - p.zc
     const x1 = v[0] * cyw - dz * syw, z1 = v[0] * syw + dz * cyw
     return [x1, dy * c - z1 * s, dy * s + z1 * c]
   }
-  const sc = (v: V3) => `${((F * v[0]) / v[2]).toFixed(1)} ${((-F * v[1]) / v[2]).toFixed(1)}`
+  const sc = (v: V3) => `${((F * v[0]) / v[2]).toFixed(1)} ${((-F * v[1]) / v[2] + shift).toFixed(1)}`
   const cut = (a: V3, b: V3): V3 => {
     const t = (NEAR - a[2]) / (b[2] - a[2])
     return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), NEAR]
