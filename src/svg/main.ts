@@ -65,12 +65,15 @@ const FRAG_END = 0.67
 const GLASS = {
   cobalt: '#1d3a9e',
   cobaltDeep: '#132a7a',
-  ruby: '#9c1a24',
-  gold: '#c98a22',
+  ruby: '#8f1424',
+  gold: '#e0a830',
+  lead: '#05060c',
   emerald: '#1f6b3c',
   murrey: '#5a2160',
 }
 /** ground + border per ring: blue dominant, ruby to punctuate */
+/** the fill for a pot-metal colour: blues shade toward violet (see #glass-blue) */
+const fillOf = (c: string) => (c === GLASS.cobalt ? 'url(#glass-blue)' : c === GLASS.cobaltDeep ? 'url(#glass-blue-deep)' : c)
 function paneColours(ring: number, i: number): { ground: string; border: string } {
   switch (ring) {
     case 0: return { ground: GLASS.ruby, border: GLASS.gold }
@@ -89,12 +92,23 @@ document.getElementById('app')!.appendChild(svg)
 const defs = el('defs', {}, svg)
 defs.innerHTML = `
   <pattern id="quarry" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-    <path d="M0 0H7M0 0V7" stroke="#05060c" stroke-width="0.55" opacity="0.85"/>
+    <path d="M0 0H7M0 0V7" stroke="#05060c" stroke-width="0.8" opacity="0.95"/>
   </pattern>
-  <radialGradient id="pane-light" cx="50%" cy="45%" r="60%">
-    <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
-    <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
+  <radialGradient id="pane-light" cx="58%" cy="40%" r="65%">
+    <stop offset="0" stop-color="#fff" stop-opacity="0.5"/>
+    <stop offset="0.45" stop-color="#9fb4ff" stop-opacity="0.16"/>
+    <stop offset="1" stop-color="#000" stop-opacity="0.3"/>
   </radialGradient>
+  <linearGradient id="glass-blue" x1="0" y1="1" x2="1" y2="0">
+    <stop offset="0" stop-color="#1f55d8"/>
+    <stop offset="0.5" stop-color="#4a52d8"/>
+    <stop offset="1" stop-color="#8a3cc4"/>
+  </linearGradient>
+  <linearGradient id="glass-blue-deep" x1="0" y1="1" x2="1" y2="0">
+    <stop offset="0" stop-color="#16379e"/>
+    <stop offset="0.5" stop-color="#3a3fb0"/>
+    <stop offset="1" stop-color="#6a2fa0"/>
+  </linearGradient>
   <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#5b74d6" stop-opacity="0.32"/>
     <stop offset="0.5" stop-color="#7b5fb0" stop-opacity="0.12"/>
@@ -144,9 +158,13 @@ const panes = roseOpenings.map((o, i) => {
   const cid = `c${i}`
   el('clipPath', { id: cid }, defs).appendChild(el('path', { d: o.d }))
   const g = el('g', { 'clip-path': `url(#${cid})`, opacity: 0 }, glassAll)
-  el('path', { d: o.d, fill: ground }, g)
+  const bw = o.ring === 0 ? 5 : 3.2
+  el('path', { d: o.d, fill: fillOf(ground) }, g)
   el('path', { d: o.d, fill: 'url(#quarry)' }, g)
-  el('path', { d: o.d, fill: 'none', stroke: border, 'stroke-width': o.ring === 0 ? 5 : 3.2 }, g)
+  // border band with a gold edge line and a came of lead round it
+  el('path', { d: o.d, fill: 'none', stroke: GLASS.lead, 'stroke-width': bw + 3.4 }, g)
+  if (border !== GLASS.gold) el('path', { d: o.d, fill: 'none', stroke: GLASS.gold, 'stroke-width': bw + 2 }, g)
+  el('path', { d: o.d, fill: 'none', stroke: border, 'stroke-width': bw }, g)
   el('path', { d: o.d, fill: 'url(#pane-light)' }, g)
   for (const [w, a] of [[9, 0.07], [5, 0.1]]) el('path', { d: o.d, stroke: ground, 'stroke-width': w, 'stroke-opacity': a }, bleed)
   return { g, r: o.r }
@@ -170,17 +188,19 @@ const claireGlass = cv.lancets.map((l, i) => {
   const cid = `l${i}`
   el('clipPath', { id: cid }, defs).appendChild(el('path', { d: l.d }))
   const g = el('g', { 'clip-path': `url(#${cid})`, opacity: 0 }, lClaire)
-  el('path', { d: l.d, fill: i % 4 === 1 ? GLASS.ruby : GLASS.cobalt }, g)
+  el('path', { d: l.d, fill: fillOf(i % 4 === 1 ? GLASS.ruby : GLASS.cobalt) }, g)
   el('path', { d: l.d, fill: 'url(#quarry)' }, g)
-  el('path', { d: l.d, fill: 'none', stroke: i % 4 === 1 ? GLASS.cobalt : GLASS.ruby, 'stroke-width': 2.6 }, g)
+  el('path', { d: l.d, fill: 'none', stroke: GLASS.lead, 'stroke-width': 6 }, g)
+  el('path', { d: l.d, fill: 'none', stroke: GLASS.gold, 'stroke-width': 4.6 }, g)
+  el('path', { d: l.d, fill: 'none', stroke: i % 4 === 1 ? fillOf(GLASS.cobalt) : GLASS.ruby, 'stroke-width': 2.6 }, g)
   el('path', { d: l.d, fill: 'url(#pane-light)' }, g)
   return { g, x: l.x }
 })
 // the oculus in each head: a ruby light with a cobalt quatrefoil at its heart
 const oculusGlass = cv.bays.map((b, i) => {
   const g = el('g', { opacity: 0 }, lClaire)
-  el('path', { d: b.oculus, fill: i % 2 ? GLASS.cobalt : GLASS.ruby }, g)
-  el('path', { d: b.foil, fill: i % 2 ? GLASS.ruby : GLASS.cobalt, stroke: GLASS.gold, 'stroke-width': 0.5 }, g)
+  el('path', { d: b.oculus, fill: i % 2 ? fillOf(GLASS.cobalt) : GLASS.ruby }, g)
+  el('path', { d: b.foil, fill: i % 2 ? GLASS.ruby : fillOf(GLASS.cobalt), stroke: GLASS.gold, 'stroke-width': 0.5 }, g)
   return { g, x: b.x }
 })
 const claireInk = cv.lancets.map((l) => ({ p: drawn(l.d, 'fine', lClaire), x: l.x }))
