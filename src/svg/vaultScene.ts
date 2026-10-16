@@ -514,7 +514,7 @@ function pose(q: number): Pose {
   const w = ease(ramp(q, 0.04, 0.96))
   const turn = ease5(ramp(q, 0.12, 0.96))
   // walk in, look up, and turn toward the wall to bring its windows round to face us
-  return { zc: lerp(POSE0.zc, -30, w), ye: lerp(POSE0.ye, -290, w), pitch: lerp(POSE0.pitch, 0.64, turn), yaw: lerp(0, -0.56, turn) }
+  return { zc: lerp(POSE0.zc, -110, w), ye: lerp(POSE0.ye, -290, w), pitch: lerp(POSE0.pitch, 0.5, turn), yaw: lerp(0, -0.42, turn) }
 }
 
 function makeProjector(p: Pose) {
