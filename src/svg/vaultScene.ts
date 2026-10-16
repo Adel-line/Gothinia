@@ -28,7 +28,7 @@ const FLOOR = 330 // springing to floor
 const CROWN = Math.SQRT2 * A // every crown reaches this height
 const BAYS = 9
 /** the far end of the nave sinks into darkness: how much of a bay still shows at depth z */
-const fogVis = (z: number) => Math.exp(-Math.max(0, z - 320) / 480)
+const fogVis = (z: number) => Math.exp(-Math.max(0, z - 200) / 360)
 const GROUND = [0x0d, 0x0b, 0x09], PIER_STONE = [0x22, 0x1c, 0x16]
 const F = 470 // focal length, in drawing units
 const NEAR = 14
@@ -628,7 +628,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
         const id = `vault-win-${k}-${i}`
         const win = el('path', {}, el('clipPath', { id }, defs))
         const clip = { 'clip-path': `url(#${id})` }
-        return [mk('rib-soffit', clip), mk('ink fine fadeout', clip), mk('ink fadeout step', clip), win] as [SVGPathElement, SVGPathElement, SVGPathElement, SVGPathElement]
+        return [mk('reveal', clip), mk('ink fine fadeout', clip), mk('ink fadeout step', clip), win] as [SVGPathElement, SVGPathElement, SVGPathElement, SVGPathElement]
       }),
       plateLow: mk('stone b', { 'fill-rule': 'evenodd', style: 'fill:#251d14' }),
       plate: mk('stone b', { 'fill-rule': 'evenodd', style: 'fill:#15120e' }),

@@ -127,6 +127,10 @@ body {
   stroke: url(#vault-fade);
   stroke-width: calc(var(--px) * 1.1px);
 }
+.reveal {
+  /* the inside of a window is a recess the light comes through, so it stands in shadow */
+  fill: #110d09;
+}
 .stone.a {
   fill: #221c16;
 }
