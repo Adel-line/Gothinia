@@ -405,7 +405,9 @@ function bayGeo(k: number): BayGeo {
   // the boss: a carved stone at the crossing, at the level of the ribs' soffits
   const boss = [ring(10, CROWN - RIB_D.d - 1.5), ring(5, CROWN - RIB_D.d - 2.5)]
   const s2 = Math.SQRT1_2
-  const inBay = { x: [-A, A] as [number, number], z: [z0, z0 + BAY] as [number, number] }
+  // a band is folded back only beyond the round capital that carries it, so it
+  // springs from the column's own axis, not from the quarter of it inside the bay
+  const inBay = { x: [-A - RIB_D.w, A + RIB_D.w] as [number, number], z: [z0 - RIB_D.w, z0 + BAY + RIB_D.w] as [number, number] }
   // painted in this order: wall ribs, diagonals, then the far transverse arch
   // (this bay's near one belongs to the bay in front, except for the first)
   const ribs: Rib[] = [
