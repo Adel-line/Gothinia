@@ -9,7 +9,7 @@ import { ease5, el, lerp, ramp, setShow } from './dom'
  * seamless):
  *
  *   melt   — the dot falls, lowest lines first,
- *            into a pool along the bottom *of the screen*;
+ *            into a carpet across the full width of the bottom of the *screen*, rippling like a wave;
  *   swarm  — the pool lifts into a loose cloud that drifts. Its home is the
  *            screen, not the drawing, so it holds its place as the camera
  *            zooms and the viewer feels the zoom through it;
@@ -31,7 +31,6 @@ export function buildSwarm(
   defs: Element,
   sources: string[],
   targets: string[],
-  view0: View,
   opts: { count?: number; seed?: number } = {},
 ) {
   const N = opts.count ?? 1100
@@ -78,7 +77,8 @@ export function buildSwarm(
     return {
       f, t,
       // where it pools, as fractions of the screen
-      pu: Math.min(1.04, Math.max(-0.04, (f.x - view0.x) / view0.w)),
+      // the pool spreads over the whole screen width, in the same left-to-right order
+      pu: -0.02 + 1.04 * ((i + rnd()) / n),
       poolV: 0.9 + rnd() * 0.09,
       cloudV: 0.46 + rnd() * 0.34,
       cloudU: 0.5 + (rnd() - 0.5) * 0.72,
@@ -114,7 +114,8 @@ export function buildSwarm(
       const mm = m * m * (1.4 - 0.4 * m) // gravity: slow to start, quick to finish
       const lift = ease5(ramp(u, 0.38, 0.62)) // pool → cloud
       const su = lerp(p.pu, p.cloudU, lift) + 0.05 * Math.sin(tau * 0.9 + p.ph) * lift + 0.012 * Math.sin(tau * 2.2 + p.ph2)
-      const sv = lerp(p.poolV, p.cloudV, lift) + 0.025 * Math.sin(tau * 1.3 + p.ph2) + 0.01 * Math.sin(tau * 3 + p.ph)
+      const wave = 0.03 * Math.sin(p.pu * TAU * 2.2 - tau * 1.1) * (1 - lift)
+      const sv = lerp(p.poolV, p.cloudV, lift) + wave + 0.025 * Math.sin(tau * 1.3 + p.ph2) + 0.01 * Math.sin(tau * 3 + p.ph)
       const sx = view.x + su * view.w
       const sy = view.y + sv * view.h
       let x = p.f.x + (sx - p.f.x) * lerp(m, mm, 0.35) + Math.sin(m * Math.PI * 2 + p.ph) * 3 * m * (1 - m) * p.sway

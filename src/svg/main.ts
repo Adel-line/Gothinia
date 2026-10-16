@@ -288,11 +288,10 @@ const swarm1 = buildSwarm(
     ...cv.bays.map((b) => b.arch),
   ],
   arch.targets,
-  viewAt(FRAG_START * G_A),
   { seed: 7 },
 )
 // …and the arches' lines melt and land as the vault
-const swarm2 = buildSwarm(svg, defs, arch.sources, vault.targets(), viewAt(T2_START), { seed: 13 })
+const swarm2 = buildSwarm(svg, defs, arch.sources, vault.targets(), { seed: 13 })
 
 // ---- overlay ------------------------------------------------------------------------
 const overlay = document.getElementById('overlay')!
