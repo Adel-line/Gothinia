@@ -200,3 +200,7 @@ body {
     transform: none;
   }
 }
+
+.ink.swarm-dot {
+  stroke-width: calc(var(--px) * 2.6px);
+}

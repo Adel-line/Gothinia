@@ -3,12 +3,12 @@ import { ease5, el, lerp, ramp, setShow } from './dom'
 /**
  * The swarm: a drawing's lines melt, gather and land as the next drawing.
  *
- * Short pieces of line are sampled along every outline of the old drawing and
- * dealt out to points on the outlines of the new one. Each piece then lives
+ * Dots are sampled along every outline of the old drawing and
+ * dealt out to points on the outlines of the new one. Each dot then lives
  * through three states, blended continuously (so scrolling either way is
  * seamless):
  *
- *   melt   — the piece stretches into a drip and falls, lowest lines first,
+ *   melt   — the dot falls, lowest lines first,
  *            into a pool along the bottom *of the screen*;
  *   swarm  — the pool lifts into a loose cloud that drifts. Its home is the
  *            screen, not the drawing, so it holds its place as the camera
@@ -22,14 +22,9 @@ import { ease5, el, lerp, ramp, setShow } from './dom'
 /** the visible part of the drawing, in drawing units */
 export interface View { x: number; y: number; w: number; h: number }
 
-interface Pt { x: number; y: number; a: number }
+interface Pt { x: number; y: number }
 
 const TAU = Math.PI * 2
-
-/** turn `a0` toward `a1` by the short way round (lines have no direction, so a half turn is none) */
-function turn(a0: number, a1: number): number {
-  return ((((a1 - a0) % Math.PI) + Math.PI * 1.5) % Math.PI) - Math.PI / 2
-}
 
 export function buildSwarm(
   svg: Element,
@@ -37,10 +32,9 @@ export function buildSwarm(
   sources: string[],
   targets: string[],
   view0: View,
-  opts: { count?: number; len?: number; seed?: number } = {},
+  opts: { count?: number; seed?: number } = {},
 ) {
-  const N = opts.count ?? 2600
-  const LEN = opts.len ?? 3
+  const N = opts.count ?? 1100
   let seed = opts.seed ?? 7
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 
@@ -59,8 +53,7 @@ export function buildSwarm(
       for (let j = 0; j < m; j++) {
         const at = ((j + rnd() * 0.8) / m) * lens[i]
         const p0 = sampler.getPointAtLength(at)
-        const p1 = sampler.getPointAtLength(Math.min(lens[i], at + 0.5))
-        out.push({ x: p0.x, y: p0.y, a: Math.atan2(p1.y - p0.y, p1.x - p0.x) })
+        out.push({ x: p0.x, y: p0.y })
       }
     })
     return out
@@ -97,12 +90,10 @@ export function buildSwarm(
       // the new drawing builds from the ground up
       dl: 0.46 + (1 - tn) * 0.15 + rnd() * 0.04,
       bend: (rnd() - 0.5) * 1.6,
-      flowA: (rnd() - 0.5) * 1.1, // a swarm piece lies roughly along its drift
-      dropA: turn(f.a, Math.PI / 2),
     }
   })
 
-  const path = el('path', { class: 'ink fine fragments' }, svg)
+  const path = el('path', { class: 'ink swarm-dot' }, svg)
   path.style.visibility = 'hidden'
 
   /**
@@ -130,9 +121,6 @@ export function buildSwarm(
       let y = p.f.y + (sy - p.f.y) * mm
       // ---- land: out of the cloud along a curve to the new line --------------------
       const l = ease5(ramp(u, p.dl, p.dl + 0.34))
-      let ang = p.f.a + p.dropA * ramp(m, 0, 0.45)
-      ang += turn(ang, p.flowA) * ramp(m, 0.55, 1)
-      let stretch = 1 + 4.5 * Math.sin(Math.PI * Math.min(1, m * 1.15)) * (1 - ramp(m, 0.7, 1) * 0.7)
       if (l > 0) {
         const dx = p.t.x - x, dy = p.t.y - y
         const dist = Math.hypot(dx, dy) || 1
@@ -141,18 +129,11 @@ export function buildSwarm(
         const a = 1 - l
         const nx = a * a * x + 2 * a * l * cx + l * l * p.t.x
         const ny = a * a * y + 2 * a * l * cy + l * l * p.t.y
-        // piece leans along its travel, then settles onto the line
-        const trav = Math.atan2(ny - y, nx - x)
-        ang = ang + turn(ang, trav) * Math.sin(Math.PI * l) * 0.8
-        ang = ang + turn(ang, p.t.a) * ease5(ramp(l, 0.55, 1))
-        stretch += 2.2 * Math.sin(Math.PI * l)
         x = nx
         y = ny
       }
-      const h = (LEN * stretch) / 2
-      const ex = Math.cos(ang) * h
-      const ey = Math.sin(ang) * h
-      d += `M${(x - ex).toFixed(1)} ${(y - ey).toFixed(1)}L${(x + ex).toFixed(1)} ${(y + ey).toFixed(1)}`
+      // a zero-length segment with round caps is a dot
+      d += `M${x.toFixed(1)} ${y.toFixed(1)}h0`
     }
     path.setAttribute('d', d)
   }
