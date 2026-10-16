@@ -118,7 +118,9 @@ export function buildSwarm(
       const sv = lerp(p.poolV, p.cloudV, lift) + wave + 0.025 * Math.sin(tau * 1.3 + p.ph2) + 0.01 * Math.sin(tau * 3 + p.ph)
       const sx = view.x + su * view.w
       const sy = view.y + sv * view.h
-      let x = p.f.x + (sx - p.f.x) * lerp(m, mm, 0.35) + Math.sin(m * Math.PI * 2 + p.ph) * 3 * m * (1 - m) * p.sway
+      // fall straight down first; only once it has dropped does it spread along the bottom
+      const spread = ease5(ramp(u, p.dm + 0.18, p.dm + 0.34))
+      let x = p.f.x + (sx - p.f.x) * spread + Math.sin(m * Math.PI * 2 + p.ph) * 1.2 * m * (1 - m) * p.sway
       let y = p.f.y + (sy - p.f.y) * mm
       // ---- land: out of the cloud along a curve to the new line --------------------
       const l = ease5(ramp(u, p.dl, p.dl + 0.34))
