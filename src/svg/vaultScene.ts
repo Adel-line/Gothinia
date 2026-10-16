@@ -34,6 +34,7 @@ const F = 470 // focal length, in drawing units
 const NEAR = 14
 const PIER = 8 // half-width of a pier
 const ABACUS = 14 // half-width of the square slab the arcade arches land on
+const VAULT_CAP = 10.5 // half-width of the capital under the vault: a gentle flare from the shaft
 const COLUMN_N = 32 // facets round a column
 const PIER_CAP = 12 // half-width of the capital
 
@@ -431,7 +432,7 @@ function bayGeo(k: number): BayGeo {
       [PIER, ARCADE_SPRING - 10, false], [PIER_CAP, ARCADE_SPRING - 5, false], [PIER_CAP, ARCADE_SPRING - 4, false],
       [ABACUS, ARCADE_SPRING - 4, true], [ABACUS, ARCADE_SPRING, true],
       // the vaulting shaft, engaged in the wall, runs on up to the vault capital
-      [PIER, ARCADE_SPRING, false], [PIER, -12, false], [PIER_CAP, -2, false], [PIER_CAP + 1.5, -2, false], [PIER_CAP + 1.5, 0, false],
+      [PIER, ARCADE_SPRING, false], [PIER, -30, false], [VAULT_CAP, -4, false], [VAULT_CAP, -3, false], [VAULT_CAP + 1, -3, false], [VAULT_CAP + 1, 0, false],
     ],
   }))
 
