@@ -521,8 +521,8 @@ function bayGeo(k: number): BayGeo {
       const l = lancet(uc, 40, SILL, 6)
       const r = reveal(s, zm, l, DEPTH.clerestory, SPLAY.clerestory, true)
       glaze(s, l, DEPTH.clerestory, SPLAY.clerestory, 11)
-      // the light comes from one side only: the right-hand windows
-      if (s === 1) shaft(s, uc, l, rays[uc < 0 ? 0 : 1])
+      // the light comes from one side only: the left-hand windows
+      if (s === -1) shaft(s, uc, l, rays[uc < 0 ? 0 : 1])
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
       reveals.push(r)
@@ -709,6 +709,9 @@ export function buildVaultScene(parent: Element, defs: Element) {
   // the thrust is drawn over the stone it runs through
   const flowG = el('g', {}, g)
   for (let k = BAYS - 1; k >= 0; k--) flowG.appendChild(els[k].flow)
+  // daylight lies over every shape, piers and ribs included
+  const rayG = el('g', { 'pointer-events': 'none' }, g)
+  for (let k = BAYS - 1; k >= 0; k--) els[k].rays.forEach((r) => rayG.appendChild(r))
   const pierPath = (k: number, i: number) =>
     (pierPaths[k][i] ??= el('path', { class: 'solid', 'stroke-linejoin': 'round' }, pierG[k]))
 
@@ -828,7 +831,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       const G = geos[k]
       const zrel = G.z0 + A - p.zc
       const visible = formed > 0 && zrel > -A - 40 && zrel < 2200
-      for (const e of [E.g, E.veil, pierG[k], E.flow]) {
+      for (const e of [E.g, E.veil, pierG[k], E.flow, ...E.rays]) {
         const d = visible ? '' : 'none'
         if (e.style.display !== d) e.style.display = d
       }
