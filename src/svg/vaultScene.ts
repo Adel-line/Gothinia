@@ -522,7 +522,7 @@ function bayGeo(k: number): BayGeo {
       const r = reveal(s, zm, l, DEPTH.clerestory, SPLAY.clerestory, true)
       glaze(s, l, DEPTH.clerestory, SPLAY.clerestory, 11)
       // the light comes from one side only: the left-hand windows
-      if (s === -1) shaft(s, uc, l, rays[uc < 0 ? 0 : 1])
+      if (s === -1) shaft(s, uc, inset(l, 9), rays[uc < 0 ? 0 : 1])
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
       reveals.push(r)
