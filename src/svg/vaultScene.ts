@@ -33,6 +33,7 @@ const GROUND = [0x0d, 0x0b, 0x09], PIER_STONE = [0x22, 0x1c, 0x16]
 const F = 470 // focal length, in drawing units
 const NEAR = 14
 const PIER = 8 // half-width of a pier
+const COLUMN_N = 32 // facets round a column
 const PIER_CAP = 12 // half-width of the capital
 
 const GLASS = { cobalt: '#1d3a9e', ruby: '#9c1a24' }
@@ -102,8 +103,7 @@ const SPLAY = { arcade: 0, triforium: 2, clerestory: 3 }
 
 /**
  * A pier as a stack of rings [half-width, height, engaged?], bottom to top.
- * Below the arcade the pier stands free, square; above it the vaulting shaft
- * is engaged in the wall, so only its half on the nave side exists.
+ * Both below and above the arcade the pier is a round column on one axis.
  */
 type Ring = [number, number, boolean]
 interface Pier { px: number; pz: number; rings: Ring[] }
@@ -117,12 +117,12 @@ interface Pier { px: number; pz: number; rings: Ring[] }
 function pierPieces(pr: Pier, ye: number, zc: number): V3[][][] {
   const { px, pz, rings } = pr
   const eye: V3 = [0, ye, zc]
-  /** the ring's four corners, anticlockwise seen from above */
-  const rect = ([h, y, eng]: Ring): V3[] => {
-    void eng
-    const x0 = px - h, x1 = px + h
-    return [[x0, y, pz - h], [x1, y, pz - h], [x1, y, pz + h], [x0, y, pz + h]]
-  }
+  /** the ring as a circle of N points, anticlockwise seen from above */
+  const rect = ([h, y]: Ring): V3[] =>
+    Array.from({ length: COLUMN_N }, (_, i): V3 => {
+      const t = (i / COLUMN_N) * Math.PI * 2
+      return [px + h * Math.cos(t), y, pz + h * Math.sin(t)]
+    })
   const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
   const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
   const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
@@ -139,15 +139,29 @@ function pierPieces(pr: Pier, ye: number, zc: number): V3[][][] {
       continue
     }
     const centre = mid([...a, ...b])
-    const faces: V3[][] = []
-    for (let i = 0; i < 4; i++) {
-      const j = (i + 1) % 4
+    const N = a.length
+    const vis = a.map((_, i) => {
+      const j = (i + 1) % N
       const q = [a[i], a[j], b[j], b[i]]
       const c = mid(q)
       let n = cross(sub(q[1], q[0]), sub(q[3], q[0]))
       const out = sub(c, centre)
       if (dot(n, [out[0], 0, out[2]]) < 0) n = [-n[0], -n[1], -n[2]]
-      if (dot(n, sub(eye, c)) > 1e-6) faces.push(q)
+      return dot(n, sub(eye, c)) > 1e-6
+    })
+    // the turned-toward-eye facets form runs; each run is one face, so the
+    // column shows only its outline and no facet seams
+    const faces: V3[][] = []
+    if (vis.every(Boolean)) faces.push(a, b)
+    else {
+      for (let s0 = 0; s0 < N; s0++) {
+        if (!vis[s0] || vis[(s0 + N - 1) % N]) continue
+        let len = 0
+        while (vis[(s0 + len) % N]) len++
+        const lo: V3[] = [], hi: V3[] = []
+        for (let k = 0; k <= len; k++) { lo.push(a[(s0 + k) % N]); hi.unshift(b[(s0 + k) % N]) }
+        faces.push([...lo, ...hi])
+      }
     }
     pieces.push({ key: dist(y0, y1), order: 0, faces })
   }
