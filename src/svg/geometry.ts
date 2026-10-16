@@ -120,24 +120,28 @@ export function nookShafts(): { fill: string; ink: string } {
   const { footY } = FRAME
   let fill = '', ink = ''
   const sw = 2.3
-  const crocket = (x: number, y0: number, h: number, dir: 1 | -1) =>
-    `M${f(x)} ${f(y0)}V${f(y0 - h + 0.9)}a0.95 0.95 0 1 ${dir === 1 ? 1 : 0} ${f(dir * 0.95)} -0.95`
+  // a crocket: a stalk rising from the astragal, ending in a knob that closes on itself
+  const crocket = (x: number, y0: number, h: number, dir: 1 | -1) => {
+    const k = 0.8, sw = dir === 1 ? 1 : 0
+    return `M${f(x)} ${f(y0)}V${f(y0 - h + 2 * k)}a${k} ${k} 0 0 ${sw} 0 ${-2 * k}a${k} ${k} 0 0 ${sw} 0 ${2 * k}`
+  }
   for (const s of [-1, 1]) {
     for (const o of [5, 13, 21]) {
       const x = s * (FRAME.half + o)
       const yTop = 5.2, yBase = footY - 9
       fill += `M${f(x - sw)} ${f(yTop)}H${f(x + sw)}V${f(yBase)}H${f(x - sw)}Z`
-      ink += `M${f(x - sw)} ${f(yTop + 7)}V${f(yBase)}M${f(x + sw)} ${f(yTop + 7)}V${f(yBase)}`
+      // the shaft runs from the astragal down to the base
+      ink += `M${f(x - sw)} 9.8V${f(yBase)}M${f(x + sw)} 9.8V${f(yBase)}`
       // abacus, bell, astragal, and three crockets
       ink += `M${f(x - 3.7)} 0h7.4v2.4h-7.4Z`
       ink += `M${f(x - 3)} 2.4C${f(x - 3)} 5.8 ${f(x - sw)} 7 ${f(x - sw)} 8.6M${f(x + 3)} 2.4C${f(x + 3)} 5.8 ${f(x + sw)} 7 ${f(x + sw)} 8.6`
       ink += `M${f(x - 2.7)} 8.6h5.4M${f(x - 2.7)} 9.8h5.4`
-      ink += crocket(x - 1.7, 8.2, 4.4, -1) + crocket(x, 8.4, 5.2, 1) + crocket(x + 1.7, 8.2, 4.4, 1)
+      ink += crocket(x - 1.7, 8.6, 4.8, -1) + crocket(x, 8.6, 5.6, 1) + crocket(x + 1.7, 8.6, 4.8, 1)
       // drum joints
       for (let y = yTop + 38; y < yBase - 6; y += 38) ink += `M${f(x - sw)} ${f(y)}H${f(x + sw)}`
-      // attic base on a plinth
+      // attic base on a plinth that stands on the sill course
       ink += `M${f(x - sw)} ${f(yBase)}q-1.4 0.3 -1.4 1.6t1.4 1.9h${f(2 * sw)}q1.4 -0.3 1.4 -1.9t-1.4 -1.6`
-      ink += `M${f(x - 4.4)} ${f(yBase + 3.5)}v3.5h8.8v-3.5`
+      ink += `M${f(x - 4.4)} ${f(yBase + 3.5)}H${f(x + 4.4)}V${f(footY)}H${f(x - 4.4)}Z`
     }
   }
   return { fill, ink }
@@ -166,6 +170,23 @@ export function roseJoints(): string {
 export function stringCourse(span: number): string {
   const { stringTop: t, stringBottom: b } = FRAME
   return `M${-span} ${f(t)}H${span}M${-span} ${f(t + 2.4)}H${span}M${-span} ${f(b)}H${span}`
+}
+
+/** The sill course: every jamb, mullion and lancet of the frame comes down onto it. */
+export function sillCourse(span: number): string {
+  const { footY } = FRAME
+  return `M${-span} ${f(footY)}H${span}M${-span} ${f(footY + 3.5)}H${span}`
+}
+
+/** The stone in the head of the arch round the rose, down to the string course (fill-rule evenodd). */
+export function spandrels(): string {
+  const { half, point, stringTop } = FRAME
+  const R = half + point
+  const apex = Math.sqrt(R * R - point * point)
+  return (
+    `M${f(-half)} ${f(stringTop)}V0A${f(R)} ${f(R)} 0 0 1 0 ${f(-apex)}A${f(R)} ${f(R)} 0 0 1 ${f(half)} 0V${f(stringTop)}Z` +
+    circle(REVEAL_R)
+  )
 }
 
 // ---- claire-voie: paired lancets, eight bays -----------------------------------
@@ -222,7 +243,7 @@ export function claireVoie(): { lancets: Lancet[]; bays: Bay[] } {
   const w = (bay - major - minor) / 2
   const top = FRAME.claireTop
   const apexY = top + 1.15 * W
-  const footY = top + 4.88 * W
+  const footY = FRAME.footY // the lights stand on the sill course
   const lancets: Lancet[] = []
   const out: Bay[] = []
   const head = (cx: number, ww: number, ay: number, sy: number) =>
@@ -254,17 +275,32 @@ export function claireVoie(): { lancets: Lancet[]; bays: Bay[] } {
   return { lancets, bays: out }
 }
 
-/** Ashlar courses on the wall either side of the frame (+ a few joints). */
+/**
+ * Ashlar courses on the wall either side of the frame. Every course and joint
+ * stops on the outermost order of the arch, so no line is left short of it or
+ * runs into it; above the crown the courses run straight across.
+ */
 export function ashlar(span: number, top: number, bottom: number): string {
+  const { half, point } = FRAME
+  const o = ORDERS[ORDERS.length - 1]
+  const R = half + point + o
+  const apex = Math.sqrt(R * R - point * point)
+  /** half-width of the frame at height y (0 above the crown) */
+  const edge = (y: number) => (y >= 0 ? half + o : y <= -apex ? 0 : Math.sqrt(R * R - y * y) - point)
   const course = 0.38 * W * 1.6
-  const clear = FRAME.half + 34
+  const len = 1.05 * W * 1.6
   let d = ''
   let row = 0
-  for (let y = top; y < bottom; y += course, row++) {
-    d += `M${-span} ${f(y)}H${f(-clear)}M${f(clear)} ${f(y)}H${span}`
-    const len = 1.05 * W * 1.6
-    for (let x = clear + ((row * 37) % 23); x < span; x += len * (0.8 + ((row * 13 + x) % 7) / 14)) {
-      d += `M${f(x)} ${f(y)}v${f(course)}M${f(-x)} ${f(y)}v${f(course)}`
+  for (let y = top; y < bottom - 0.5; y += course, row++) {
+    const e = edge(y)
+    d += e > 0 ? `M${-span} ${f(y)}H${f(-e)}M${f(e)} ${f(y)}H${span}` : `M${-span} ${f(y)}H${span}`
+    const h = Math.min(course, bottom - y)
+    const eLow = edge(y + h) // the frame is widest at the bottom of the course
+    for (let x = (row * 37) % 23; x < span; x += len * (0.8 + ((row * 13 + x) % 7) / 14)) {
+      for (const s of [-1, 1]) {
+        const xx = s * (x + (row % 2) * len * 0.5)
+        if (Math.abs(xx) > eLow + 3 && Math.abs(xx) < span) d += `M${f(xx)} ${f(y)}v${f(h)}`
+      }
     }
   }
   return d

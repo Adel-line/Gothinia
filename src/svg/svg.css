@@ -53,6 +53,9 @@ body {
   stroke-width: calc(var(--px) * 0.8px);
   stroke-opacity: 0.32;
 }
+.ink.step {
+  stroke-width: calc(var(--px) * 0.8px);
+}
 .ink.fadeout {
   stroke: url(#vault-fade);
 }
@@ -104,6 +107,29 @@ body {
 
 .stone {
   fill: var(--stone);
+}
+/* the vault's ribs: a darker side and a lighter soffit, so each reads as a solid band */
+.rib-side {
+  fill: #1a1510;
+}
+.lead {
+  fill: none;
+  stroke: #05060c;
+  stroke-width: calc(var(--px) * 0.7px);
+  stroke-linecap: round;
+}
+.rib-soffit {
+  fill: #2e271e;
+}
+/* solid stone drawn with its edges: the vault's piers */
+.solid {
+  fill: #221c16;
+  stroke: url(#vault-fade);
+  stroke-width: calc(var(--px) * 1.1px);
+}
+.reveal {
+  /* the inside of a window is a recess the light comes through, so it stands in shadow */
+  fill: #110d09;
 }
 .stone.a {
   fill: #221c16;

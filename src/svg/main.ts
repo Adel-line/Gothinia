@@ -18,6 +18,8 @@ import {
   plateFill,
   roseJoints,
   roseOpenings,
+  sillCourse,
+  spandrels,
   stringCourse,
 } from './geometry'
 import { drawn, ease, el, monotone, ramp, setDraw, setOp, setShow, smoothDamp } from './dom'
@@ -122,6 +124,7 @@ const SPAN = 420
 const wallLines = drawn(ashlar(SPAN, -260, FRAME.footY), 'faint', lWall)
 const stringLine = drawn(stringCourse(SPAN), 'fine', lWall)
 const toothLine = drawn(dogtooth(SPAN), 'fine', lWall)
+const sillLine = drawn(sillCourse(SPAN), 'fine', lWall)
 
 // light shafts falling from the rose into the nave (towards the viewer)
 const shafts = [
@@ -187,12 +190,16 @@ const foilInk = drawn(cv.bays.map((b) => b.foil).join(''), 'fine', lClaire)
 // frame: the arch as moulded stone — bands between the orders, voussoir joints,
 // nook shafts with their capitals and bases
 const nooks = nookShafts()
+// the head of the arch round the rose is solid stone, down to the string course
+const spandrelFill = el('path', { d: spandrels(), class: 'stone', 'fill-rule': 'evenodd', opacity: 0 }, lFrame)
 const bandA = el('path', { d: archBand(0, 5) + archBand(13, 21), class: 'stone a', opacity: 0 }, lFrame)
 const bandB = el('path', { d: archBand(5, 13) + archBand(21, 29), class: 'stone b', opacity: 0 }, lFrame)
 const shaftFill = el('path', { d: nooks.fill, class: 'stone a', opacity: 0 }, lFrame)
 const orderInk = ORDERS.map((o) => drawn(archOrder(o), o === 0 ? 'bold' : 'fine', lFrame))
 const jointInk = drawn(archJoints(), 'faint2', lFrame)
 const capInk = drawn(nooks.ink, 'fine', lFrame)
+// the sill course, in full ink across the frame (the wall carries it on, fading)
+const frameSill = drawn(sillCourse(FRAME.half + ORDERS[ORDERS.length - 1]), 'fine', lFrame)
 
 // ---- scene 2: the pointed arch, where the rose stood ------------------------------
 // the pair of arches (local x −68 … ROUND_X + 68, y −150 … 250) is centred
@@ -345,6 +352,7 @@ function render(G: number): void {
 
   // 3. the pull-back: arch, string course, claire-voie, wall
   orderInk.forEach((o, i) => setDraw(o, ease(ramp(p, 0.55 + i * 0.025, 0.7 + i * 0.025))))
+  setOp(spandrelFill, ramp(p, 0.7, 0.8) * dim)
   setOp(bandA, ramp(p, 0.66, 0.76) * dim)
   setOp(bandB, ramp(p, 0.68, 0.78) * dim)
   setDraw(jointInk, ease(ramp(p, 0.7, 0.82)))
@@ -352,6 +360,8 @@ function render(G: number): void {
   setDraw(capInk, ease(ramp(p, 0.7, 0.82)))
   setDraw(stringLine, ease(ramp(p, 0.62, 0.74)))
   setDraw(toothLine, ease(ramp(p, 0.68, 0.8)))
+  setDraw(sillLine, ease(ramp(p, 0.64, 0.76)))
+  setDraw(frameSill, ease(ramp(p, 0.64, 0.76)))
   claireInk.forEach(({ p: path, x }) => setDraw(path, ease(ramp(p, 0.66 + x * 0.06, 0.74 + x * 0.06))))
   bayInk.forEach(({ p: path, x }) => setDraw(path, ease(ramp(p, 0.7 + x * 0.06, 0.8 + x * 0.06))))
   setOp(bayPlates, ramp(p, 0.76, 0.84) * dim)
