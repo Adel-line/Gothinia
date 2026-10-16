@@ -467,8 +467,10 @@ function bayGeo(k: number): BayGeo {
     }
     // the arcade: a pointed arch from capital to capital
     const aw = pointed(A - PIER - 2).map(([u, y]): [number, number] => [u, y + ARCADE_SPRING])
-    wallLines.push(onWall(s, aw))
-    reveals.push(reveal(s, zm, aw, DEPTH.arcade, SPLAY.arcade, false))
+    // its jambs run straight down to the floor, so the opening is closed all round
+    const awf: [number, number][] = [[aw[0][0], -FLOOR], ...aw, [aw[aw.length - 1][0], -FLOOR]]
+    wallLines.push(onWall(s, awf))
+    reveals.push(reveal(s, zm, awf, DEPTH.arcade, SPLAY.arcade, false))
     // the wall over the arcade, up to the clerestory sill: solid, pierced by the triforium
     plateLow.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, ARCADE_SPRING], ...aw, [A - PIER, ARCADE_SPRING], [A - PIER, SILL]]))
     // triforium: a string course, then five pointed openings on colonnettes
@@ -485,7 +487,7 @@ function bayGeo(k: number): BayGeo {
     // clerestory sill: two strings, the whole width of the bay between the piers
     wallLines.push(onWall(s, [[-A + PIER, SILL], [A - PIER, SILL]]), onWall(s, [[-A + PIER, SILL - 7], [A - PIER, SILL - 7]]))
     // the floor, along the foot of the arcade from plinth to plinth
-    wallLines.push(onWall(s, [[-A + PIER + 8, -FLOOR], [A - PIER - 8, -FLOOR]]))
+    wallLines.push(onWall(s, [[-A + PIER + 2, -FLOOR], [A - PIER - 2, -FLOOR]]))
     // clerestory: stone from the sill up to the wall arch, pierced by two lancets and an oculus
     plates.push(onWall(s, [[-A + PIER, SILL], [-A + PIER, 0], ...ARCH, [A - PIER, 0], [A - PIER, SILL]]))
     // where the wall meets the pier, from the arcade capital up to the vault capital
