@@ -522,7 +522,7 @@ function bayGeo(k: number): BayGeo {
       const r = reveal(s, zm, l, DEPTH.clerestory, SPLAY.clerestory, true)
       glaze(s, l, DEPTH.clerestory, SPLAY.clerestory, 11)
       // the light comes from one side only: the left-hand windows
-      if (s === -1) shaft(s, uc, inset(l, 9), rays[uc < 0 ? 0 : 1])
+      if (s === -1) shaft(s, uc, inset(l, 9).map(([u, y]): [number, number] => [u, y + 5]), rays[uc < 0 ? 0 : 1])
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
       reveals.push(r)
@@ -690,8 +690,8 @@ export function buildVaultScene(parent: Element, defs: Element) {
       bossFill: mk('rib-soffit'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
       // daylight through the glass, added to what is behind it
       rays: [
-        mk('', { fill: 'url(#vault-ray-gold)', style: 'mix-blend-mode:screen', 'pointer-events': 'none' }),
-        mk('', { fill: 'url(#vault-ray-blue)', style: 'mix-blend-mode:screen', 'pointer-events': 'none' }),
+        mk('', { fill: 'url(#vault-ray-gold)', 'pointer-events': 'none' }),
+        mk('', { fill: 'url(#vault-ray-blue)', 'pointer-events': 'none' }),
       ],
       // painted after the bay, so the veils over the far bays add up: fog
       veil: el('rect', { x: -4000, y: -4000, width: 8000, height: 8000, fill: '#0d0b09', 'pointer-events': 'none' }, g),
@@ -710,7 +710,9 @@ export function buildVaultScene(parent: Element, defs: Element) {
   const flowG = el('g', {}, g)
   for (let k = BAYS - 1; k >= 0; k--) flowG.appendChild(els[k].flow)
   // daylight lies over every shape, piers and ribs included
-  const rayG = el('g', { 'pointer-events': 'none' }, g)
+  const blur = el('filter', { id: 'vault-ray-blur', x: '-10%', y: '-10%', width: '120%', height: '120%' }, defs)
+  el('feGaussianBlur', { stdDeviation: 2.5 }, blur)
+  const rayG = el('g', { 'pointer-events': 'none', filter: 'url(#vault-ray-blur)', style: 'mix-blend-mode:screen' }, g)
   for (let k = BAYS - 1; k >= 0; k--) els[k].rays.forEach((r) => rayG.appendChild(r))
   const pierPath = (k: number, i: number) =>
     (pierPaths[k][i] ??= el('path', { class: 'solid', 'stroke-linejoin': 'round' }, pierG[k]))
@@ -885,7 +887,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       setOp(E.courses, courses * atm * near); setOp(E.bricks, 0.4 * courses * atm * near)
       setOp(E.ribHi, hi * atm)
       setOp(E.flow, flows * atm)
-      E.rays.forEach((e, i) => { set(e, b.rays?.[i]); setOp(e, glass * near * near * atm) })
+      E.rays.forEach((e, i) => { set(e, b.rays?.[i]); setOp(e, 0.8 * glass * near * near * atm) })
       E.flow.style.strokeDashoffset = String(-flowPhase)
     }
   }
