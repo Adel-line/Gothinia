@@ -586,7 +586,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
     /** the stained glass: ground, border, leading, and a sheen on each pane */
     glass: { cobalt: SVGPathElement; ruby: SVGPathElement; lead: SVGPathElement; panes: SVGPathElement[] }
     /** the openings' reveals: each its faces and its edges, clipped to its own opening */
-    revs: [SVGPathElement, SVGPathElement, SVGPathElement][]
+    revs: [SVGPathElement, SVGPathElement, SVGPathElement, SVGPathElement][]
     courses: SVGPathElement; walls: SVGPathElement
     bricks: SVGPathElement; wallClip: [SVGPathElement, SVGPathElement]
     /** per rib: its visible side, its soffit, and its ink */
@@ -628,7 +628,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
         const id = `vault-win-${k}-${i}`
         const win = el('path', {}, el('clipPath', { id }, defs))
         const clip = { 'clip-path': `url(#${id})` }
-        return [mk('rib-soffit', clip), mk('ink fine fadeout', clip), win] as [SVGPathElement, SVGPathElement, SVGPathElement]
+        return [mk('rib-soffit', clip), mk('ink fine fadeout', clip), mk('ink fadeout step', clip), win] as [SVGPathElement, SVGPathElement, SVGPathElement, SVGPathElement]
       }),
       plateLow: mk('stone b', { 'fill-rule': 'evenodd', style: 'fill:#251d14' }),
       plate: mk('stone b', { 'fill-rule': 'evenodd', style: 'fill:#15120e' }),
@@ -684,6 +684,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
     const revs = G.reveals.map((r) => {
       const revFaces: string[] = []
       const revInk: V3[][] = []
+      const revStep: V3[][] = []
       const vis = r.quads.map((q, i) => {
         const c = lerp3(q[0], q[2], 0.5), n = r.n[i]
         return n[0] * (eye[0] - c[0]) + n[1] * (eye[1] - c[1]) + n[2] * (eye[2] - c[2]) > 0
@@ -706,6 +707,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       const pick = (line: V3[], i0: number, n: number) => Array.from({ length: n + 1 }, (_, k) => line[(i0 + k) % pts])
       for (const [i0, n] of runs) {
         revInk.push(pick(r.back, i0, n))
+        revStep.push(pick(r.order, i0, n))
         // each end of a run is closed by the reveal's edge there, front to back:
         // an arris at a corner, the outline of the curve where it turns out of
         // sight. Whatever of it runs on behind the face of the wall is covered by it.
@@ -718,7 +720,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       // only what shows through its own opening: the window it is seen through
       const f = r.front
       const win = r.closed ? f : [...f, [f[f.length - 1][0], -FLOOR, f[f.length - 1][2]] as V3, [f[0][0], -FLOOR, f[0][2]] as V3]
-      return { fill: revFaces.join(''), ink: join(revInk), win: P.poly(win) }
+      return { fill: revFaces.join(''), ink: join(revInk), step: join(revStep), win: P.poly(win) }
     })
     const revealInk = revs.map((r) => r.ink).join('')
     const walls = join(G.wallLines)
@@ -803,9 +805,10 @@ export function buildVaultScene(parent: Element, defs: Element) {
       for (const e of [E.glass.cobalt, E.glass.ruby, E.glass.lead, ...E.glass.panes]) setOp(e, glass)
       set(E.courses, b.courses); set(E.walls, b.walls)
       b.revs.forEach((r, i) => {
-        const [fill, ink, win] = E.revs[i]
-        set(fill, r.fill); set(ink, r.ink); set(win, r.win)
-        setOp(fill, stone); setOp(ink, atm * near)
+        const [fill, ink, step, win] = E.revs[i]
+        set(fill, r.fill); set(ink, r.ink); set(step, r.step); set(win, r.win)
+        // the step of the order: a darker, finer line, so it gives depth without standing out
+        setOp(fill, stone); setOp(ink, atm * near); setOp(step, 0.4 * atm * near)
       })
       b.ribParts.forEach((r, i) => {
         const [side, soffit, ink] = E.ribs[i]

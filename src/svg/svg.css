@@ -53,6 +53,9 @@ body {
   stroke-width: calc(var(--px) * 0.8px);
   stroke-opacity: 0.32;
 }
+.ink.step {
+  stroke-width: calc(var(--px) * 0.8px);
+}
 .ink.fadeout {
   stroke: url(#vault-fade);
 }
