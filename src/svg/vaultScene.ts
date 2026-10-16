@@ -37,7 +37,7 @@ const ABACUS = 14 // half-width of the square slab the arcade arches land on
 const COLUMN_N = 32 // facets round a column
 const PIER_CAP = 12 // half-width of the capital
 
-const GLASS = { cobalt: '#1d3a9e', ruby: '#9c1a24' }
+const GLASS = { cobalt: 'url(#vault-glass-ground)', ruby: '#8f1424' }
 
 // ---- curves -------------------------------------------------------------------
 /** A pointed arch of half-span s: arcs of radius 1.5 s struck from ±s/2 about the axis. Points (x, y). */
@@ -358,7 +358,7 @@ function clipToConvex(poly: [number, number][], p: [number, number], q: [number,
  * the plane of the glass; `lead` is the leading, as lines, and `panes` the
  * lights themselves (each takes its own sheen).
  */
-interface Glass { cobalt: P2[][]; ruby: P2[][]; lead: P2[][]; panes: P2[][] }
+interface Glass { cobalt: P2[][]; ruby: P2[][]; gold: P2[][]; lead: P2[][]; panes: P2[][] }
 type P2 = [number, number]
 type Glass3 = Record<keyof Glass, V3[][]>
 function stainedGlass(out: P2[], step: number): Glass {
@@ -374,7 +374,7 @@ function stainedGlass(out: P2[], step: number): Glass {
       if (seg) lead.push(seg)
     }
   }
-  return { cobalt: [out], ruby: [out, inner], lead, panes: [out] }
+  return { cobalt: [out], ruby: [out, inner], gold: [[...inner, inner[0]]], lead, panes: [inner] }
 }
 
 interface BayGeo {
@@ -498,7 +498,7 @@ function bayGeo(k: number): BayGeo {
   const plates: V3[][] = []
   const plateLow: V3[][] = []
   const reveals: Reveal[] = []
-  const glass: Glass3 = { cobalt: [], ruby: [], lead: [], panes: [] }
+  const glass: Glass3 = { cobalt: [], ruby: [], gold: [], lead: [], panes: [] }
   /** glaze an opening: its outline drawn in by the splay, at the back of a wall `depth` thick */
   const glaze = (s: -1 | 1, pts: P2[], depth: number, splay: number, step: number) => {
     const gl = stainedGlass(inset(pts, splay), step)
@@ -673,13 +673,22 @@ export function buildVaultScene(parent: Element, defs: Element) {
     el('stop', { offset: 0.55, 'stop-color': c, 'stop-opacity': 0.07 }, gr)
     el('stop', { offset: 1, 'stop-color': c, 'stop-opacity': 0 }, gr)
   }
+  // glass: a blue ground shading to violet, and a white heart where the light comes through
+  const ground = el('linearGradient', { id: 'vault-glass-ground', x1: 0, y1: 1, x2: 1, y2: 0 }, defs)
+  el('stop', { offset: 0, 'stop-color': '#1f55d8' }, ground)
+  el('stop', { offset: 0.5, 'stop-color': '#4a52d8' }, ground)
+  el('stop', { offset: 1, 'stop-color': '#8a3cc4' }, ground)
+  const glow = el('radialGradient', { id: 'vault-pane-glow', cx: '58%', cy: '40%', r: '65%' }, defs)
+  el('stop', { offset: 0, 'stop-color': '#fff', 'stop-opacity': 0.6 }, glow)
+  el('stop', { offset: 0.45, 'stop-color': '#9fb4ff', 'stop-opacity': 0.18 }, glow)
+  el('stop', { offset: 1, 'stop-color': '#000', 'stop-opacity': 0.3 }, glow)
   const geos = Array.from({ length: BAYS }, (_, k) => bayGeo(k))
 
   interface BayEls {
     g: SVGGElement
     webA: SVGPathElement; webB: SVGPathElement; plate: SVGPathElement; plateLow: SVGPathElement
     /** the stained glass: ground, border, leading, and a sheen on each pane */
-    glass: { cobalt: SVGPathElement; ruby: SVGPathElement; lead: SVGPathElement; panes: SVGPathElement[] }
+    glass: { cobalt: SVGPathElement; ruby: SVGPathElement; gold: SVGPathElement; lead: SVGPathElement; panes: SVGPathElement[] }
     /** the openings' reveals: each its faces and its edges, clipped to its own opening */
     revs: [SVGPathElement, SVGPathElement, SVGPathElement, SVGPathElement][]
     courses: SVGPathElement; walls: SVGPathElement
@@ -716,8 +725,9 @@ export function buildVaultScene(parent: Element, defs: Element) {
       webB: mk('stone b', { style: `fill:${k % 2 ? '#1b160f' : '#2d2418'}` }),
       // through the openings: the glass at the back of the wall, then the reveals, then the wall's face
       glass: {
-        cobalt: mk('', { fill: GLASS.cobalt }), ruby: mk('', { fill: GLASS.ruby, 'fill-rule': 'evenodd' }), lead: mk('lead'),
-        panes: geos[k].glass.panes.map(() => mk('', { fill: 'url(#pane-light)' })),
+        cobalt: mk('', { fill: GLASS.cobalt }), ruby: mk('', { fill: GLASS.ruby, 'fill-rule': 'evenodd' }),
+        gold: mk('lead', { style: 'stroke:#f0b43a;stroke-width:calc(var(--px) * 2.4px)' }), lead: mk('lead', { style: 'stroke-width:calc(var(--px) * 1.1px)' }),
+        panes: geos[k].glass.panes.map(() => mk('', { fill: 'url(#vault-pane-glow)' })),
       },
       // (the reveals' edges go under the face too: where a reveal runs on behind it, so do they)
       revs: geos[k].reveals.map((_, i) => {
@@ -845,6 +855,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       glass: {
         cobalt: G.glass.cobalt.map((q) => P.poly(q)).join(''),
         ruby: G.glass.ruby.map((q) => P.poly(q)).join(''),
+        gold: join(G.glass.gold),
         lead: join(G.glass.lead),
         panes: G.glass.panes.map((q) => P.poly(q)),
       },
@@ -906,10 +917,10 @@ export function buildVaultScene(parent: Element, defs: Element) {
       set(E.webA, b.webA); set(E.webB, b.webB); set(E.plate, b.plate); set(E.plateLow, b.plateLow)
       set(E.wallClip[0], b.plate); set(E.wallClip[1], b.plateLow); set(E.bricks, b.bricks)
       if (b.glass) {
-        set(E.glass.cobalt, b.glass.cobalt); set(E.glass.ruby, b.glass.ruby); set(E.glass.lead, b.glass.lead)
+        set(E.glass.cobalt, b.glass.cobalt); set(E.glass.ruby, b.glass.ruby); set(E.glass.gold, b.glass.gold); set(E.glass.lead, b.glass.lead)
         E.glass.panes.forEach((e, i) => set(e, b.glass?.panes[i]))
       }
-      for (const e of [E.glass.cobalt, E.glass.ruby, E.glass.lead, ...E.glass.panes]) setOp(e, glass)
+      for (const e of [E.glass.cobalt, E.glass.ruby, E.glass.gold, E.glass.lead, ...E.glass.panes]) setOp(e, glass)
       set(E.courses, b.courses); set(E.walls, b.walls)
       b.revs.forEach((r, i) => {
         const [fill, ink, step, win] = E.revs[i]
