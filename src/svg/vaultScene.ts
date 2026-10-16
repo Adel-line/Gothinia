@@ -90,6 +90,11 @@ const circle2 = (u: number, y: number, r: number, n = 22): [number, number][] =>
 // ---- one bay's geometry (world space, built once) --------------------------------------
 const SILL = -62 // clerestory sill
 const ARCADE_SPRING = -270
+/** the flare of an arcade capital's bell: [half-width, height above the neck], easing out to the abacus */
+const BELL: [number, number][] = Array.from({ length: 3 }, (_, i) => {
+  const t = (i + 1) / 3
+  return [8 + (ABACUS - 1.5 - 8) * Math.sin((t * Math.PI) / 2), -12 + 8 * t]
+})
 const TRI_SILL = -130 // triforium sill, just over the arcade's crown
 const TRI_SPRING = -102 // where the triforium heads spring
 /** the height of a course and the length of a stone, in the wall's coursing */
@@ -477,10 +482,11 @@ function bayGeo(k: number): BayGeo {
       // plinth, base, shaft up to the arcade capital
       [PIER + 8, -FLOOR, 0], [PIER + 8, -FLOOR + 11, 0], [PIER + 5.5, -FLOOR + 11, 0],
       [PIER + 5.5, -FLOOR + 26, 0], [PIER, -FLOOR + 26, 0],
-      // arcade capital: bell and abacus; the arcade arches land on it
-      [PIER, ARCADE_SPRING - 16, 0], [PIER + 2, ARCADE_SPRING - 16, 0], [PIER + 2, ARCADE_SPRING - 13, 0],
-      [PIER, ARCADE_SPRING - 13, 0], [PIER_CAP, ARCADE_SPRING - 5, 0], [PIER_CAP, ARCADE_SPRING - 4, 0],
-      [ABACUS, ARCADE_SPRING - 4, 1], [ABACUS, ARCADE_SPRING - 2, 1], [ABACUS - 2.5, ARCADE_SPRING, 1],
+      // arcade capital: a bead at the neck, a flared bell, and a round abacus the arcade arches land on
+      [PIER, ARCADE_SPRING - 17, 0], [PIER + 1.6, ARCADE_SPRING - 16, 0], [PIER + 2.2, ARCADE_SPRING - 14.5, 0],
+      [PIER + 1.6, ARCADE_SPRING - 13, 0], [PIER, ARCADE_SPRING - 12, 0],
+      ...BELL.map(([h, y]): Ring => [h, ARCADE_SPRING + y, 0]),
+      [ABACUS, ARCADE_SPRING - 4, 0], [ABACUS, ARCADE_SPRING - 1.8, 0], [ABACUS - 1.8, ARCADE_SPRING, 0],
       // the vaulting shaft, engaged in the wall, runs on up to the vault capital
       [PIER, ARCADE_SPRING, 2], [PIER, -12, 2], [PIER_CAP, -2, 2], [PIER_CAP + 1.5, -2, 2], [PIER_CAP + 1.5, 0, 2],
     ] as Ring[]).map(([h, y, m]): Ring => [h, y, k === 0 ? (m === 2 ? 0 : m) : (m === 0 ? 2 : m)]),
