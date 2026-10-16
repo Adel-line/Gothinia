@@ -39,10 +39,10 @@ export const PIER_FOOT = 230
 export const ROUND_X = 205
 
 const GLASS = {
-  cobalt: '#1d3a9e',
-  deep: '#132a7a',
-  ruby: '#9c1a24',
-  gold: '#c98a22',
+  cobalt: 'url(#glass-blue)',
+  deep: 'url(#glass-blue-deep)',
+  ruby: '#8f1424',
+  gold: '#e0a830',
   lead: '#05060c',
 }
 
@@ -379,7 +379,8 @@ export function buildArchScene(parent: Element, defs: Element, place: ArchPlacem
     el('path', { d: opening, fill: GLASS.cobalt }, w)
     el('path', { d: opening, fill: 'url(#quarry)' }, w)
     // ruby border band, with a lead came on its inner edge
-    el('path', { d: opening, fill: 'none', stroke: GLASS.lead, 'stroke-width': S(17.8) }, w)
+    el('path', { d: opening, fill: 'none', stroke: GLASS.lead, 'stroke-width': S(21) }, w)
+    el('path', { d: opening, fill: 'none', stroke: GLASS.gold, 'stroke-width': S(19) }, w)
     el('path', { d: opening, fill: 'none', stroke: GLASS.ruby, 'stroke-width': S(16) }, w)
     const h = PIER_FOOT - top
     const medY = [top + 0.27 * h, top + 0.55 * h, top + 0.83 * h]
