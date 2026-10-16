@@ -368,6 +368,18 @@ interface BayGeo {
   /** the stained glass of every window, at the back of the wall */
   glass: Glass3
   flow: V3[][]
+  /** shafts of daylight from the clerestory lights, [gold, blue] */
+  rays: [V3[][], V3[][]]
+}
+
+/** convex hull (monotone chain) of tagged points in the (u, y) plane */
+function hull2<T extends [number, number, number]>(pts: T[]): T[] {
+  const P = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const cr = (o: T, a: T, b: T) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+  const lo: T[] = [], hi: T[] = []
+  for (const p of P) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p) }
+  for (const p of P.slice().reverse()) { while (hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p) }
+  return lo.slice(0, -1).concat(hi.slice(0, -1))
 }
 
 function bayGeo(k: number): BayGeo {
@@ -461,6 +473,15 @@ function bayGeo(k: number): BayGeo {
     for (const key of Object.keys(glass) as (keyof Glass)[]) glass[key].push(...gl[key].map(back))
   }
   const onWall = (s: -1 | 1, pts: [number, number][]): V3[] => pts.map(([u, y]) => [s * A, y, zm + u])
+  const rays: [V3[][], V3[][]] = [[], []]
+  // daylight through a clerestory light falls inward and down: the sweep of the opening
+  const RAY_DROP = 230, RAY_IN = 0.62, RAY_FWD = 0.1
+  const shaft = (s: -1 | 1, uc: number, l: [number, number][], into: V3[][]) => {
+    const x0 = s * (A + DEPTH.clerestory)
+    // tag 0: at the glass; tag 1: carried down the ray
+    const pts: [number, number, number][] = [...l.map(([u, y]): [number, number, number] => [u, y, 0]), ...l.map(([u, y]): [number, number, number] => [uc + (u - uc) * 0.7 + RAY_FWD * RAY_DROP, y - RAY_DROP, 1])]
+    into.push(hull2(pts).map(([u, y, t]): V3 => [x0 - s * RAY_IN * RAY_DROP * t, y, zm + u]))
+  }
   for (const s of [-1, 1] as const) {
     // the coursing: beds across the whole face between the piers, and stagger joints
     // between them, half a stone out of step from one course to the next. The face's
@@ -500,6 +521,7 @@ function bayGeo(k: number): BayGeo {
       const l = lancet(uc, 40, SILL, 6)
       const r = reveal(s, zm, l, DEPTH.clerestory, SPLAY.clerestory, true)
       glaze(s, l, DEPTH.clerestory, SPLAY.clerestory, 11)
+      shaft(s, uc, l, rays[uc < 0 ? 0 : 1])
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
       reveals.push(r)
@@ -520,7 +542,7 @@ function bayGeo(k: number): BayGeo {
   }
   return {
     z0, transverseS, transverseN, wallW, wallE, d1, d2, cells, courses, boss, ribs, wallLines, piers,
-    platePolys: plates, plateLow, bricks, reveals, glass, flow,
+    platePolys: plates, plateLow, bricks, reveals, glass, flow, rays,
   }
 }
 
@@ -594,6 +616,13 @@ export function buildVaultScene(parent: Element, defs: Element) {
   const fade = el('linearGradient', { id: 'vault-fade', gradientUnits: 'userSpaceOnUse', x1: 0, y1: -60, x2: 0, y2: 330 }, defs)
   el('stop', { offset: 0, 'stop-color': '#d9ccb2' }, fade)
   el('stop', { offset: 1, 'stop-color': '#d9ccb2', 'stop-opacity': 0 }, fade)
+  // beams fade from the glass as they travel
+  for (const [id, c] of [['gold', '#ffcf86'], ['blue', '#7f9bff']]) {
+    const gr = el('linearGradient', { id: `vault-ray-${id}`, x1: 0, y1: 0, x2: 0, y2: 1 }, defs)
+    el('stop', { offset: 0, 'stop-color': c, 'stop-opacity': 0.26 }, gr)
+    el('stop', { offset: 0.55, 'stop-color': c, 'stop-opacity': 0.07 }, gr)
+    el('stop', { offset: 1, 'stop-color': c, 'stop-opacity': 0 }, gr)
+  }
   const geos = Array.from({ length: BAYS }, (_, k) => bayGeo(k))
 
   interface BayEls {
@@ -607,6 +636,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
     bricks: SVGPathElement; wallClip: [SVGPathElement, SVGPathElement]
     /** per rib: its visible side, its soffit, and its ink */
     ribs: [SVGPathElement, SVGPathElement, SVGPathElement][]
+    rays: [SVGPathElement, SVGPathElement]
     ribHi: SVGPathElement; bossFill: SVGPathElement; boss: SVGPathElement; flow: SVGPathElement
     /** a veil of the ground colour over this bay and all beyond it */
     veil: SVGRectElement
@@ -657,6 +687,11 @@ export function buildVaultScene(parent: Element, defs: Element) {
       courses: mk('ink faint2'), walls: mk('ink fine fadeout'),
       ...ribEls(geos[k].ribs.length, mk),
       bossFill: mk('rib-soffit'), boss: mk('ink fine'), flow: mk('flow', { 'stroke-dasharray': '7 8' }),
+      // daylight through the glass, added to what is behind it
+      rays: [
+        mk('', { fill: 'url(#vault-ray-gold)', style: 'mix-blend-mode:screen', 'pointer-events': 'none' }),
+        mk('', { fill: 'url(#vault-ray-blue)', style: 'mix-blend-mode:screen', 'pointer-events': 'none' }),
+      ],
       // painted after the bay, so the veils over the far bays add up: fog
       veil: el('rect', { x: -4000, y: -4000, width: 8000, height: 8000, fill: '#0d0b09', 'pointer-events': 'none' }, g),
     }
@@ -761,6 +796,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       courses: join(G.courses),
       ribHi: join([G.ribs[2].roll, G.ribs[3].roll]),
       flow: join(G.flow),
+      rays: G.rays.map((r) => r.map((q) => P.poly(q)).join('')),
     }
   }
 
@@ -845,6 +881,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       setOp(E.courses, courses * atm * near); setOp(E.bricks, 0.4 * courses * atm * near)
       setOp(E.ribHi, hi * atm)
       setOp(E.flow, flows * atm)
+      E.rays.forEach((e, i) => { set(e, b.rays?.[i]); setOp(e, glass * (0.4 + 0.6 * near)) })
       E.flow.style.strokeDashoffset = String(-flowPhase)
     }
   }
