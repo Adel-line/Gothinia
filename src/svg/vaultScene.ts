@@ -521,7 +521,8 @@ function bayGeo(k: number): BayGeo {
       const l = lancet(uc, 40, SILL, 6)
       const r = reveal(s, zm, l, DEPTH.clerestory, SPLAY.clerestory, true)
       glaze(s, l, DEPTH.clerestory, SPLAY.clerestory, 11)
-      shaft(s, uc, l, rays[uc < 0 ? 0 : 1])
+      // the light comes from one side only: the right-hand windows
+      if (s === 1) shaft(s, uc, l, rays[uc < 0 ? 0 : 1])
       plates.push(onWall(s, l))
       wallLines.push(onWall(s, [...l, l[0]]))
       reveals.push(r)
@@ -881,7 +882,7 @@ export function buildVaultScene(parent: Element, defs: Element) {
       setOp(E.courses, courses * atm * near); setOp(E.bricks, 0.4 * courses * atm * near)
       setOp(E.ribHi, hi * atm)
       setOp(E.flow, flows * atm)
-      E.rays.forEach((e, i) => { set(e, b.rays?.[i]); setOp(e, glass * (0.4 + 0.6 * near)) })
+      E.rays.forEach((e, i) => { set(e, b.rays?.[i]); setOp(e, glass * near * near * atm) })
       E.flow.style.strokeDashoffset = String(-flowPhase)
     }
   }
